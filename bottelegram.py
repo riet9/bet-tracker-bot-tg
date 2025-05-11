@@ -74,6 +74,10 @@ async def info(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🟢 /value_stats — статистика по #value ставкам (кэфы 1.60–2.50)\n"
         "🟢 /top_type — сравнение эффективности #safe и #value ставок\n"
         "🟢 /history #type — история ставок по типу (#safe, #value, #normal)\n"
+        "🟢 /summary — отчёт за сегодня\n"
+        "🟢 /summary 7d — отчёт за последние 7 дней\n"
+        "🟢 /summary 30d — отчёт за месяц\n"
+
 
         "\n📁 Все данные сохраняются между перезапусками\n"
         "💬 Просто используй команды или следуй подсказкам"
@@ -152,11 +156,21 @@ async def bet_step_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if amount > bank:
                 await update.message.reply_text(f"⚠️ У тебя только {bank:.2f}€. Введи меньшую сумму.")
                 return
+
             context.user_data["amount"] = amount
             context.user_data["bet_step"] = "coeff"
-            await update.message.reply_text("Введи коэффициент (например: 1.85)")
+
+            # Проверка на слишком крупную ставку
+            percentage = (amount / bank) * 100
+            warning = ""
+            if percentage >= 20:
+                warning = f"\n⚠️ Это {percentage:.1f}% от твоего банка. Уверен в ставке?"
+
+            await update.message.reply_text(f"Введи коэффициент (например: 1.85){warning}")
+
         except:
             await update.message.reply_text("⚠️ Введи корректное число. Пример: 2.5")
+
 
     elif step == "coeff":
         try:
@@ -478,6 +492,41 @@ async def history(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(message)
 
+async def summary(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    now = datetime.datetime.now()
+    today = now.date()
+
+    period = context.args[0] if context.args else "today"
+
+    if period == "today":
+        filtered = [b for b in bets if b['time'].date() == today]
+        label = "Сегодня"
+    elif period == "7d":
+        cutoff = now - datetime.timedelta(days=7)
+        filtered = [b for b in bets if b['time'] >= cutoff]
+        label = "За 7 дней"
+    elif period == "30d":
+        cutoff = now - datetime.timedelta(days=30)
+        filtered = [b for b in bets if b['time'] >= cutoff]
+        label = "За 30 дней"
+    else:
+        await update.message.reply_text("❌ Используй: /summary, /summary 7d или /summary 30d")
+        return
+
+    completed = [b for b in filtered if b["status"] != "pending"]
+    wins = [b for b in completed if b["status"] == "win"]
+    losses = [b for b in completed if b["status"] == "lose"]
+    profit = sum((b["amount"] * b["coeff"] - b["amount"]) if b["status"] == "win" else -b["amount"] for b in completed)
+
+    await update.message.reply_text(
+        f"📆 <b>{label}:</b>\n"
+        f"📋 Всего ставок: {len(filtered)} (завершено: {len(completed)})\n"
+        f"✅ Победы: {len(wins)} | ❌ Поражения: {len(losses)}\n"
+        f"💸 Прибыль: {profit:.2f}€\n"
+        f"💰 Текущий банк: {bank:.2f}€",
+        parse_mode="HTML"
+    )
+
 
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     completed_bets = [b for b in bets if b["status"] != "pending"]
@@ -535,6 +584,8 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler("value_stats", value_stats))
     app.add_handler(CommandHandler("top_type", top_type))
     app.add_handler(CommandHandler("history", history))
+    app.add_handler(CommandHandler("summary", summary))
+
     app.add_handler(CommandHandler("bank", bank_command))
     app.add_handler(CommandHandler("graph", graph))
     app.add_handler(CommandHandler("delete", delete))
