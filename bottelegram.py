@@ -34,8 +34,62 @@ async def info(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/info — это меню"
     )
 
+# Первая команда /bet
 async def bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Напиши ставку в формате:\nМатч: NaVi vs G2\nСумма: 2\nКэф: 1.75")
+    context.user_data["bet_step"] = "match"
+    await update.message.reply_text("Введи название матча (пример: NaVi vs G2)")
+
+# Обработка каждого шага
+async def bet_step_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global bets, bank
+    step = context.user_data.get("bet_step")
+
+    if step == "match":
+        context.user_data["match"] = update.message.text.strip()
+        context.user_data["bet_step"] = "amount"
+        await update.message.reply_text("Введи сумму ставки в € (например: 2.5)")
+
+    elif step == "amount":
+        try:
+            amount = float(update.message.text.strip())
+            if amount <= 0:
+                await update.message.reply_text("⚠️ Сумма должна быть больше 0. Попробуй ещё раз.")
+                return
+            if amount > bank:
+                await update.message.reply_text(f"⚠️ У тебя только {bank:.2f}€. Введи меньшую сумму.")
+                return
+            context.user_data["amount"] = amount
+            context.user_data["bet_step"] = "coeff"
+            await update.message.reply_text("Введи коэффициент (например: 1.85)")
+        except:
+            await update.message.reply_text("⚠️ Введи корректное число. Пример: 2.5")
+
+    elif step == "coeff":
+        try:
+            coeff = float(update.message.text.strip())
+            if coeff < 1:
+                await update.message.reply_text("⚠️ Коэффициент должен быть не меньше 1.00")
+                return
+
+            match = context.user_data["match"]
+            amount = context.user_data["amount"]
+            bet_time = datetime.datetime.now()
+
+            bets.append({
+                "match": match,
+                "amount": amount,
+                "coeff": coeff,
+                "status": "pending",
+                "time": bet_time
+            })
+
+            bank -= amount
+            context.user_data.clear()
+
+            await update.message.reply_text(f"✅ Ставка добавлена: {match}, {amount}€, кэф {coeff}\n💰 Банк: {bank:.2f}€")
+        except:
+            await update.message.reply_text("⚠️ Введи корректный коэффициент. Пример: 1.75")
+
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global bets, bank
@@ -106,6 +160,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             bet["status"] = "lose"
             await query.edit_message_text(f"❌ Поражение: {bet['match']}\n-{bet['amount']:.2f}€\n💰 Банк: {bank:.2f}€")
+            
 
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     wins = sum(1 for b in bets if b["status"] == "win")
@@ -139,5 +194,10 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler("export", export))
     app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+    app.add_handler(MessageHandler(
+    filters.TEXT & ~filters.COMMAND,
+    bet_step_handler
+))
+
 
     app.run_polling()
