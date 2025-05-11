@@ -55,6 +55,8 @@ async def info(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🟢 <b>/bank [сумма]</b> — вручную установить текущий банк\n"
         "🟢 <b>/info</b> — показать это меню\n"
         "🟢 <b>/cancel</b> — отменить добавление ставки на любом этапе\n"
+        "🟢 <b>/delete</b> — удалить активную ставку и вернуть деньги в банк\n"
+        "🟢 <b>/undelete</b> — восстановить удалённую ставку (если удалил случайно)\n"
         "🟢 <b>/pending</b> — список активных ставок (ещё не завершённых)\n"
         "\n📁 Все данные сохраняются между перезапусками\n"
         "💬 Просто используй команды или следуй подсказкам"
@@ -188,6 +190,44 @@ async def pending(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(message, parse_mode="HTML")
 
+async def delete(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    keyboard = []
+    for i, b in enumerate(bets):
+        if b["status"] == "pending":
+            keyboard.append([
+                InlineKeyboardButton(
+                    f"{b['match']} ({b['amount']}€, @ {b['coeff']})",
+                    callback_data=f"del_{i}"
+                )
+            ])
+    if not keyboard:
+        await update.message.reply_text("❌ Нет активных ставок для удаления.")
+        return
+
+    await update.message.reply_text(
+        "🗑️ Выбери ставку для удаления:",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+async def undelete(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    keyboard = []
+    for i, b in enumerate(bets):
+        if b["status"] == "deleted":
+            keyboard.append([
+                InlineKeyboardButton(
+                    f"{b['match']} ({b['amount']}€, @ {b['coeff']})",
+                    callback_data=f"undel_{i}"
+                )
+            ])
+    if not keyboard:
+        await update.message.reply_text("📦 Нет удалённых ставок для восстановления.")
+        return
+
+    await update.message.reply_text(
+        "♻️ Выбери ставку для восстановления:",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if "bet_step" in context.user_data:
@@ -247,6 +287,41 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(
             f"Выбрана ставка: {bets[index]['match']}\nВыбери результат:",
             reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        
+    elif query.data.startswith("del_"):
+        index = int(query.data.split("_")[1])
+        if index >= len(bets) or bets[index]["status"] != "pending":
+            await query.edit_message_text("⚠️ Ставка не найдена или уже завершена.")
+            return
+
+        # Возврат в банк
+        global bank
+        bank += bets[index]["amount"]
+        bets[index]["status"] = "deleted"
+        save_data()
+
+        await query.edit_message_text(
+            f"❌ Ставка удалена: {bets[index]['match']}\n💰 Банк возвращён: {bets[index]['amount']}€\nТекущий банк: {bank:.2f}€"
+        )
+    
+    elif query.data.startswith("undel_"):
+        index = int(query.data.split("_")[1])
+        if index >= len(bets) or bets[index]["status"] != "deleted":
+            await query.edit_message_text("⚠️ Ставка не найдена или уже восстановлена.")
+            return
+
+        global bank
+        if bank < bets[index]["amount"]:
+            await query.edit_message_text("⚠️ Недостаточно средств в банке для восстановления.")
+            return
+
+        bank -= bets[index]["amount"]
+        bets[index]["status"] = "pending"
+        save_data()
+
+        await query.edit_message_text(
+            f"✅ Ставка восстановлена: {bets[index]['match']}\n💸 {bets[index]['amount']}€ вычтено из банка\nТекущий банк: {bank:.2f}€"
         )
 
     elif query.data in ["result_win", "result_lose"]:
@@ -330,6 +405,8 @@ if __name__ == '__main__':
 ))
     app.add_handler(CommandHandler("bank", bank_command))
     app.add_handler(CommandHandler("graph", graph))
+    app.add_handler(CommandHandler("delete", delete))
+    app.add_handler(CommandHandler("undelete", undelete))
     app.add_handler(CommandHandler("pending", pending))
     app.add_handler(CommandHandler("cancel", cancel))
 
