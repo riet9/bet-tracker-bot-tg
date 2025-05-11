@@ -19,8 +19,20 @@ def load_data():
         bets = []
 
 def save_data():
+    # Создаём резервную копию
+    try:
+        if os.path.exists(DATA_FILE):
+            with open(DATA_FILE, "r") as original:
+                content = original.read()
+            with open("data_backup.json", "w") as backup:
+                backup.write(content)
+    except Exception as e:
+        print(f"[WARN] Не удалось создать резервную копию: {e}")
+
+    # Сохраняем новые данные
     with open(DATA_FILE, "w") as file:
         json.dump({"bank": bank, "bets": bets}, file, indent=2, default=str)
+
 
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import (
@@ -306,12 +318,13 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     
     elif query.data.startswith("undel_"):
+        global bank
+        
         index = int(query.data.split("_")[1])
         if index >= len(bets) or bets[index]["status"] != "deleted":
             await query.edit_message_text("⚠️ Ставка не найдена или уже восстановлена.")
             return
 
-        global bank
         if bank < bets[index]["amount"]:
             await query.edit_message_text("⚠️ Недостаточно средств в банке для восстановления.")
             return
