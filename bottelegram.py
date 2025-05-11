@@ -159,11 +159,18 @@ async def bet_step_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             bank -= amount
             context.user_data.clear()
             save_data()
-
+            
+            # Запланировать напоминание через 24 часа
+            job_queue.run_once(
+                remind_result,
+                when=datetime.timedelta(hours=24),
+                data={"chat_id": update.effective_chat.id, "match": match}
+            )
+            
             await update.message.reply_text(f"✅ Ставка добавлена: {match}, {amount}€, кэф {coeff}\n💰 Банк: {bank:.2f}€")
         except:
             await update.message.reply_text("⚠️ Введи корректный коэффициент. Пример: 1.75")
-
+        
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if "bet_step" in context.user_data:
@@ -245,6 +252,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text(f"❌ Поражение: {bet['match']}\n-{bet['amount']:.2f}€\n💰 Банк: {bank:.2f}€")
             save_data()
             
+async def remind_result(context: ContextTypes.DEFAULT_TYPE):
+    job_data = context.job.data
+    chat_id = job_data["chat_id"]
+    match = job_data["match"]
+    await context.bot.send_message(chat_id=chat_id, text=f"🔔 Напоминание: не забудь ввести результат ставки: {match}\nНапиши /result")
+
 
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     completed_bets = [b for b in bets if b["status"] != "pending"]
@@ -284,6 +297,7 @@ async def export(update: Update, context: ContextTypes.DEFAULT_TYPE):
 if __name__ == '__main__':
     load_data()
     app = ApplicationBuilder().token(TOKEN).build()
+    job_queue = app.job_queue
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("info", info))
