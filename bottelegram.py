@@ -72,7 +72,8 @@ async def info(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🟢 <b>/pending</b> — список активных ставок (ещё не завершённых)\n"
         "🟢 /safe_stats — статистика по #safe ставкам (низкие кэфы)\n"
         "🟢 /value_stats — статистика по #value ставкам (кэфы 1.60–2.50)\n"
-        "🟢 🟢 /top_type — сравнение эффективности #safe и #value ставок\n"
+        "🟢 /top_type — сравнение эффективности #safe и #value ставок\n"
+        "🟢 /history #type — история ставок по типу (#safe, #value, #normal)\n"
 
         "\n📁 Все данные сохраняются между перезапусками\n"
         "💬 Просто используй команды или следуй подсказкам"
@@ -454,6 +455,29 @@ async def top_type(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(msg, parse_mode="HTML")
 
+async def history(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("ℹ️ Используй: /history #safe или /history #value")
+        return
+
+    arg = context.args[0].lstrip("#").lower()
+    if arg not in ["safe", "value", "normal"]:
+        await update.message.reply_text("❌ Неверный тип. Доступны: #safe, #value, #normal")
+        return
+
+    filtered = [b for b in bets if b.get("type") == arg and b["status"] != "pending"]
+    if not filtered:
+        await update.message.reply_text(f"📭 Нет завершённых #{arg} ставок.")
+        return
+
+    message = f"📖 История #{arg} ставок:\n\n"
+    for b in filtered[-10:]:  # Показываем только последние 10
+        date = b['time'].strftime("%d.%m %H:%M")
+        status = "✅" if b["status"] == "win" else "❌"
+        message += f"{status} {b['match']} — {b['amount']}€ @ {b['coeff']} ({date})\n"
+
+    await update.message.reply_text(message)
+
 
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     completed_bets = [b for b in bets if b["status"] != "pending"]
@@ -510,6 +534,7 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler("safe_stats", safe_stats))
     app.add_handler(CommandHandler("value_stats", value_stats))
     app.add_handler(CommandHandler("top_type", top_type))
+    app.add_handler(CommandHandler("history", history))
     app.add_handler(CommandHandler("bank", bank_command))
     app.add_handler(CommandHandler("graph", graph))
     app.add_handler(CommandHandler("delete", delete))
