@@ -70,6 +70,10 @@ async def info(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🟢 <b>/delete</b> — удалить активную ставку и вернуть деньги в банк\n"
         "🟢 <b>/undelete</b> — восстановить удалённую ставку (если удалил случайно)\n"
         "🟢 <b>/pending</b> — список активных ставок (ещё не завершённых)\n"
+        "🟢 /safe_stats — статистика по #safe ставкам (низкие кэфы)\n"
+        "🟢 /value_stats — статистика по #value ставкам (кэфы 1.60–2.50)\n"
+        "🟢 🟢 /top_type — сравнение эффективности #safe и #value ставок\n"
+
         "\n📁 Все данные сохраняются между перезапусками\n"
         "💬 Просто используй команды или следуй подсказкам"
     , parse_mode="HTML")
@@ -164,12 +168,21 @@ async def bet_step_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             amount = context.user_data["amount"]
             bet_time = datetime.datetime.now()
 
+            # Определение типа ставки
+            if coeff <= 1.20:
+                bet_type = "safe"
+            elif 1.60 <= coeff <= 2.50:
+                bet_type = "value"
+            else:
+                bet_type = "normal"
+
             bets.append({
                 "match": match,
                 "amount": amount,
                 "coeff": coeff,
                 "status": "pending",
-                "time": bet_time
+                "time": bet_time,
+                "type": bet_type
             })
 
             bank -= amount
@@ -183,10 +196,12 @@ async def bet_step_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 data={"chat_id": update.effective_chat.id, "match": match}
             )
             
-            await update.message.reply_text(f"✅ Ставка добавлена: {match}, {amount}€, кэф {coeff}\n💰 Банк: {bank:.2f}€")
+            await update.message.reply_text(f"✅ Ставка добавлена: {match}, {amount}€, кэф {coeff} ({'#' + bet_type})\n💰 Банк: {bank:.2f}€")
+
         except:
             await update.message.reply_text("⚠️ Введи корректный коэффициент. Пример: 1.75")
         
+
 
 async def pending(update: Update, context: ContextTypes.DEFAULT_TYPE):
     pending_bets = [b for b in bets if b["status"] == "pending"]
@@ -362,6 +377,84 @@ async def remind_result(context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(chat_id=chat_id, text=f"🔔 Напоминание: не забудь ввести результат ставки: {match}\nНапиши /result")
 
 
+
+async def show_type_stats(update: Update, context: ContextTypes.DEFAULT_TYPE, bet_type: str):
+    filtered = [b for b in bets if b.get("type") == bet_type and b["status"] != "pending"]
+    if not filtered:
+        await update.message.reply_text(f"📭 Нет завершённых ставок с типом #{bet_type}.")
+        return
+
+    wins = [b for b in filtered if b["status"] == "win"]
+    losses = [b for b in filtered if b["status"] == "lose"]
+    total = len(filtered)
+    total_wagered = sum(b["amount"] for b in filtered)
+    profit = sum((b["amount"] * b["coeff"] - b["amount"]) if b["status"] == "win" else -b["amount"] for b in filtered)
+    avg_coeff = sum(b["coeff"] for b in filtered) / total
+    winrate = len(wins) / total * 100
+
+    await update.message.reply_text(
+        f"📊 Статистика по #{bet_type} ставкам:\n"
+        f"🎯 Завершено: {total}\n"
+        f"✅ Побед: {len(wins)} | ❌ Поражений: {len(losses)}\n"
+        f"📈 Winrate: {winrate:.1f}%\n"
+        f"📉 Средний кэф: {avg_coeff:.2f}\n"
+        f"📥 ROI: {profit:.2f}€"
+    )
+
+async def safe_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await show_type_stats(update, context, "safe")
+
+async def value_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await show_type_stats(update, context, "value")
+
+async def top_type(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    def get_stats(bet_type):
+        filtered = [b for b in bets if b.get("type") == bet_type and b["status"] != "pending"]
+        if not filtered:
+            return None
+        wins = [b for b in filtered if b["status"] == "win"]
+        total = len(filtered)
+        profit = sum((b["amount"] * b["coeff"] - b["amount"]) if b["status"] == "win" else -b["amount"] for b in filtered)
+        winrate = len(wins) / total * 100
+        avg_coeff = sum(b["coeff"] for b in filtered) / total
+        return {
+            "count": total,
+            "wins": len(wins),
+            "winrate": winrate,
+            "profit": profit,
+            "avg_coeff": avg_coeff
+        }
+
+    safe = get_stats("safe")
+    value = get_stats("value")
+
+    if not safe and not value:
+        await update.message.reply_text("❌ Нет завершённых #safe или #value ставок.")
+        return
+
+    msg = "📊 <b>Сравнение #safe и #value ставок:</b>\n\n"
+
+    def fmt(title, s):
+        return (
+            f"<b>{title}:</b>\n"
+            f"🎯 Завершено: {s['count']} | ✅ Побед: {s['wins']}\n"
+            f"📈 Winrate: {s['winrate']:.1f}%\n"
+            f"📉 Средний кэф: {s['avg_coeff']:.2f}\n"
+            f"📥 ROI: {s['profit']:.2f}€\n\n"
+        )
+
+    if safe:
+        msg += fmt("#safe", safe)
+    if value:
+        msg += fmt("#value", value)
+
+    if safe and value:
+        better = "#safe" if safe["profit"] > value["profit"] else "#value"
+        msg += f"🏆 Сейчас <b>{better}</b> стратегия приносит больше прибыли!"
+
+    await update.message.reply_text(msg, parse_mode="HTML")
+
+
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     completed_bets = [b for b in bets if b["status"] != "pending"]
     wins = [b for b in completed_bets if b["status"] == "win"]
@@ -414,6 +507,9 @@ if __name__ == '__main__':
     filters.TEXT & ~filters.COMMAND,
     bet_step_handler
 ))
+    app.add_handler(CommandHandler("safe_stats", safe_stats))
+    app.add_handler(CommandHandler("value_stats", value_stats))
+    app.add_handler(CommandHandler("top_type", top_type))
     app.add_handler(CommandHandler("bank", bank_command))
     app.add_handler(CommandHandler("graph", graph))
     app.add_handler(CommandHandler("delete", delete))
