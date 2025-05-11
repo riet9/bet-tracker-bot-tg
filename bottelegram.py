@@ -40,7 +40,7 @@ bank = 10.0
 bets = []
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Привет! Я твой бот для ставок. Напиши /bet чтобы добавить ставку.")
+    await update.message.reply_text("Привет! Я твой бот для ставок. Напиши /bet чтобы добавить ставку. \n /info - что бы узнать список доступных команд")
 
 async def info(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
@@ -52,7 +52,8 @@ async def info(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🟢 <b>/export</b> — выгрузить историю ставок в CSV\n"
         "🟢 <b>/graph</b> — график роста банка по завершённым ставкам\n"
         "🟢 <b>/bank [сумма]</b> — вручную установить текущий банк\n"
-        "🟢 <b>/info</b> — показать это меню\n\n"
+        "🟢 <b>/info</b> — показать это меню\n"
+        "🟢 <b>/cancel</b> — отменить добавление ставки на любом этапе\n\n"
         "📁 Все данные сохраняются между перезапусками\n"
         "💬 Просто используй команды или следуй подсказкам"
     , parse_mode="HTML")
@@ -162,6 +163,14 @@ async def bet_step_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(f"✅ Ставка добавлена: {match}, {amount}€, кэф {coeff}\n💰 Банк: {bank:.2f}€")
         except:
             await update.message.reply_text("⚠️ Введи корректный коэффициент. Пример: 1.75")
+
+
+async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if "bet_step" in context.user_data:
+        context.user_data.clear()
+        await update.message.reply_text("❌ Добавление ставки отменено.")
+    else:
+        await update.message.reply_text("ℹ️ Сейчас нет активного ввода ставки.")
 
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -290,6 +299,8 @@ if __name__ == '__main__':
 ))
     app.add_handler(CommandHandler("bank", bank_command))
     app.add_handler(CommandHandler("graph", graph))
+    app.add_handler(CommandHandler("cancel", cancel))
+
 
 
 
