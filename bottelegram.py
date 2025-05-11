@@ -29,6 +29,7 @@ from telegram.ext import (
 )
 
 from dotenv import load_dotenv
+
 load_dotenv()
 TOKEN = os.getenv("BOT_TOKEN")
 
@@ -53,8 +54,9 @@ async def info(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🟢 <b>/graph</b> — график роста банка по завершённым ставкам\n"
         "🟢 <b>/bank [сумма]</b> — вручную установить текущий банк\n"
         "🟢 <b>/info</b> — показать это меню\n"
-        "🟢 <b>/cancel</b> — отменить добавление ставки на любом этапе\n\n"
-        "📁 Все данные сохраняются между перезапусками\n"
+        "🟢 <b>/cancel</b> — отменить добавление ставки на любом этапе\n"
+        "🟢 <b>/pending</b> — список активных ставок (ещё не завершённых)\n"
+        "\n📁 Все данные сохраняются между перезапусками\n"
         "💬 Просто используй команды или следуй подсказкам"
     , parse_mode="HTML")
 
@@ -171,6 +173,21 @@ async def bet_step_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except:
             await update.message.reply_text("⚠️ Введи корректный коэффициент. Пример: 1.75")
         
+
+async def pending(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    pending_bets = [b for b in bets if b["status"] == "pending"]
+
+    if not pending_bets:
+        await update.message.reply_text("✅ Все ставки завершены!")
+        return
+
+    message = "📋 <b>Активные ставки:</b>\n\n"
+    for i, b in enumerate(pending_bets, 1):
+        date_str = b['time'].strftime("%d.%m %H:%M")
+        message += f"{i}. {b['match']} — {b['amount']}€ @ {b['coeff']} ({date_str})\n"
+
+    await update.message.reply_text(message, parse_mode="HTML")
+
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if "bet_step" in context.user_data:
@@ -313,6 +330,7 @@ if __name__ == '__main__':
 ))
     app.add_handler(CommandHandler("bank", bank_command))
     app.add_handler(CommandHandler("graph", graph))
+    app.add_handler(CommandHandler("pending", pending))
     app.add_handler(CommandHandler("cancel", cancel))
 
 
