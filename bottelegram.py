@@ -308,7 +308,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         # Возврат в банк
-        global bank
         bank += bets[index]["amount"]
         bets[index]["status"] = "deleted"
         save_data()
@@ -318,7 +317,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     
     elif query.data.startswith("undel_"):
-        global bank
         
         index = int(query.data.split("_")[1])
         if index >= len(bets) or bets[index]["status"] != "deleted":
