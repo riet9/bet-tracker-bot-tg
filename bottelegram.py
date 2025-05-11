@@ -3,6 +3,7 @@ import os
 import datetime
 import csv
 import json
+import matplotlib.pyplot as plt
 
 DATA_FILE = "data.json"
 
@@ -51,6 +52,54 @@ async def info(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/export — экспортировать в CSV\n"
         "/info — это меню"
     )
+    
+async def bank_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global bank
+    if context.args:
+        try:
+            new_bank = float(context.args[0])
+            if new_bank < 0:
+                await update.message.reply_text("⚠️ Банк не может быть отрицательным.")
+                return
+            bank = new_bank
+            save_data()
+            await update.message.reply_text(f"✅ Новый банк установлен: {bank:.2f}€")
+        except:
+            await update.message.reply_text("⚠️ Введи число. Пример:\n/bank 15")
+    else:
+        await update.message.reply_text(f"💰 Текущий банк: {bank:.2f}€\nЧтобы изменить, введи:\n/bank 20")
+
+async def graph(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    completed_bets = [b for b in bets if b["status"] != "pending"]
+    if not completed_bets:
+        await update.message.reply_text("Нет завершённых ставок для графика.")
+        return
+
+    x = []
+    y = []
+    current = 10.0  # начнем с фиксированного старта
+
+    for b in completed_bets:
+        x.append(b["time"].strftime("%Y-%m-%d %H:%M"))
+        if b["status"] == "win":
+            current += b["amount"] * b["coeff"]
+        else:
+            current -= b["amount"]
+        y.append(current)
+
+    plt.figure(figsize=(8, 4))
+    plt.plot(x, y, marker="o")
+    plt.xticks(rotation=45, ha='right')
+    plt.title("📈 Рост банка по завершённым ставкам")
+    plt.xlabel("Дата и время")
+    plt.ylabel("Банк (€)")
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig("bank_graph.png")
+    plt.close()
+
+    await update.message.reply_photo(photo=open("bank_graph.png", "rb"))
+
 
 # Первая команда /bet
 async def bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -184,14 +233,28 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
 
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    wins = sum(1 for b in bets if b["status"] == "win")
-    total = sum(1 for b in bets if b["status"] != "pending")
-    roi = sum((b["amount"] * b["coeff"] - b["amount"]) if b["status"] == "win" else -b["amount"]
-              for b in bets if b["status"] != "pending")
-    winrate = (wins / total * 100) if total > 0 else 0
+    completed_bets = [b for b in bets if b["status"] != "pending"]
+    wins = [b for b in completed_bets if b["status"] == "win"]
+    losses = [b for b in completed_bets if b["status"] == "lose"]
+
+    total = len(completed_bets)
+    total_wagered = sum(b["amount"] for b in completed_bets)
+    total_profit = sum((b["amount"] * b["coeff"] - b["amount"]) if b["status"] == "win" else -b["amount"]
+                       for b in completed_bets)
+    avg_coeff = sum(b["coeff"] for b in completed_bets) / total if total else 0
+    winrate = (len(wins) / total * 100) if total else 0
+
     await update.message.reply_text(
-        f"📊 Статистика:\nБанк: {bank:.2f}€\nСтавок: {total}\nВыиграно: {wins}\nWinrate: {winrate:.1f}%\nROI: {roi:.2f}€"
+        f"📊 Статистика:\n"
+        f"💰 Банк: {bank:.2f}€\n"
+        f"🎯 Ставок завершено: {total}\n"
+        f"✅ Побед: {len(wins)} | ❌ Поражений: {len(losses)}\n"
+        f"📈 Winrate: {winrate:.1f}%\n"
+        f"📉 Средний кэф: {avg_coeff:.2f}\n"
+        f"💸 Сумма ставок: {total_wagered:.2f}€\n"
+        f"📥 Прибыль (ROI): {total_profit:.2f}€"
     )
+
 
 async def export(update: Update, context: ContextTypes.DEFAULT_TYPE):
     with open("bets_export.csv", mode="w", newline="") as file:
@@ -220,6 +283,9 @@ if __name__ == '__main__':
     filters.TEXT & ~filters.COMMAND,
     bet_step_handler
 ))
+    app.add_handler(CommandHandler("bank", bank_command))
+    app.add_handler(CommandHandler("graph", graph))
+
 
 
     app.run_polling()
