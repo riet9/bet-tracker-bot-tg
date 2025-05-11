@@ -2,6 +2,24 @@ import logging
 import os
 import datetime
 import csv
+import json
+
+DATA_FILE = "data.json"
+
+def load_data():
+    global bank, bets
+    try:
+        with open(DATA_FILE, "r") as file:
+            data = json.load(file)
+            bank = data.get("bank", 10.0)
+            bets = data.get("bets", [])
+    except FileNotFoundError:
+        bank = 10.0
+        bets = []
+
+def save_data():
+    with open(DATA_FILE, "w") as file:
+        json.dump({"bank": bank, "bets": bets}, file, indent=2, default=str)
 
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import (
@@ -85,6 +103,7 @@ async def bet_step_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             bank -= amount
             context.user_data.clear()
+            save_data()
 
             await update.message.reply_text(f"✅ Ставка добавлена: {match}, {amount}€, кэф {coeff}\n💰 Банк: {bank:.2f}€")
         except:
@@ -157,9 +176,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             bank += profit
             bet["status"] = "win"
             await query.edit_message_text(f"✅ Победа: {bet['match']}\n+{profit:.2f}€\n💰 Банк: {bank:.2f}€")
+            save_data()
         else:
             bet["status"] = "lose"
             await query.edit_message_text(f"❌ Поражение: {bet['match']}\n-{bet['amount']:.2f}€\n💰 Банк: {bank:.2f}€")
+            save_data()
             
 
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -184,6 +205,7 @@ async def export(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_document(document=open("bets_export.csv", "rb"), filename="bets_export.csv")
 
 if __name__ == '__main__':
+    load_data()
     app = ApplicationBuilder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
