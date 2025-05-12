@@ -3,7 +3,8 @@ import os
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-DATA_FILE = "data/users_data.json"
+# 📁 Railway persistent storage
+DATA_FILE = "/mnt/data/users_data.json"
 LATVIA_TZ = ZoneInfo("Europe/Riga")
 users_data = {}
 
@@ -12,8 +13,13 @@ def load_data():
     try:
         with open(DATA_FILE, "r", encoding="utf-8") as f:
             users_data = json.load(f)
+            print("[INFO] Данные загружены из файла.")
     except FileNotFoundError:
         users_data = {}
+        print("[INFO] Файл данных не найден, создана новая структура.")
+    except Exception as e:
+        users_data = {}
+        print(f"[ERROR] Ошибка при загрузке: {e}")
 
 def save_data():
     os.makedirs(os.path.dirname(DATA_FILE), exist_ok=True)
@@ -22,13 +28,17 @@ def save_data():
         if os.path.exists(DATA_FILE):
             with open(DATA_FILE, "r", encoding="utf-8") as original:
                 content = original.read()
-            with open("data/data_backup.json", "w", encoding="utf-8") as backup:
+            with open("/mnt/data/data_backup.json", "w", encoding="utf-8") as backup:
                 backup.write(content)
     except Exception as e:
         print(f"[WARN] Не удалось создать резервную копию: {e}")
 
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(users_data, f, indent=2, ensure_ascii=False, default=str)
+    try:
+        with open(DATA_FILE, "w", encoding="utf-8") as f:
+            json.dump(users_data, f, indent=2, ensure_ascii=False, default=str)
+        print("[INFO] Данные сохранены.")
+    except Exception as e:
+        print(f"[ERROR] Ошибка при сохранении: {e}")
 
 def get_user(chat_id: str):
     chat_id = str(chat_id)
