@@ -6,7 +6,7 @@ from utils.storage import get_user
 # /top_teams — показать топ команд по ставкам
 async def top_teams(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = get_user(str(update.effective_chat.id))
-    completed = [b for b in user["bets"] if b["status"] != "pending"]
+    completed = [b for b in user["bets"] if b["status"] in ("win", "lose")]
     matches = [b["match"] for b in completed]
 
     teams = []
@@ -32,7 +32,8 @@ async def top_teams(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # /review — краткий анализ последних 10 ставок
 async def review(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = get_user(str(update.effective_chat.id))
-    last_bets = [b for b in user["bets"] if b["status"] != "pending"][-10:]
+    last_bets = [b for b in user["bets"] if b["status"] in ("win", "lose")][-10:]
+
 
     if not last_bets:
         await update.message.reply_text("📭 Нет завершённых ставок для анализа.")
