@@ -4,10 +4,10 @@ import os
 
 # Импортируем хендлеры из модулей (после их создания)
 from handlers.core import start, info, bank_command, users_count
-from handlers.betting import bet, cancel, pending, delete, undelete, bet_step_handler
+from handlers.betting import bet, cancel, pending,  bet_step_handler
 from handlers.today import today, prompt, prompt_button_handler
 from handlers.stats import stats, summary, safe_stats, value_stats, top_type, history, graph, export
-from handlers.buttons import button_handler
+from handlers.buttons import button_handler, delete, undelete
 from utils.storage import load_data
 from handlers.reminders import morning_reminder
 
