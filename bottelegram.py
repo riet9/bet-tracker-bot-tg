@@ -288,68 +288,6 @@ async def undelete(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 #region Работа с прогнозом дня
 
-# async def today(update: Update, context: ContextTypes.DEFAULT_TYPE):
-#     text = update.message.text
-#     lines = text.splitlines()[1:]  # убираем "/today"
-#     if len(lines) < 2:
-#         await update.message.reply_text("⚠️ Вставь прогноз в формате:\n\nМатч – исход @кэф\nПояснение")
-#         return
-
-#     safe, value = [], []
-#     i = 0
-#     while i < len(lines):
-#         line = lines[i].strip()
-#         if "@" not in line:
-#             i += 1
-#             continue
-
-#         # Следующая строка — пояснение
-#         explanation = ""
-#         if i + 1 < len(lines):
-#             explanation = lines[i+1].strip()
-#             if "@" in explanation or explanation == "":
-#                 explanation = ""
-#             else:
-#                 i += 1  # пропускаем пояснение как уже обработанное
-
-#         # Парсим коэффициент
-#         try:
-#             coeff = float(line.split("@")[-1].strip())
-#         except:
-#             coeff = None
-
-#         # Категория
-#         if coeff:
-#             if coeff <= 1.20 and len(safe) < 2:
-#                 safe.append((line, explanation))
-#             elif 1.60 <= coeff <= 2.50 and len(value) < 5:
-#                 value.append((line, explanation))
-
-#         i += 1
-
-#     # Формируем сообщение
-#     msg = "📅 <b>Ставки на сегодня:</b>\n\n"
-
-#     if safe:
-#         msg += "<b>#safe:</b>\n"
-#         for idx, (line, expl) in enumerate(safe, 1):
-#             msg += f"{idx}. {line}\n"
-#             if expl:
-#                 msg += f"💬 {expl}\n"
-#         msg += "\n"
-
-#     if value:
-#         msg += "<b>#value:</b>\n"
-#         for idx, (line, expl) in enumerate(value, 1):
-#             msg += f"{idx}. {line}\n"
-#             if expl:
-#                 msg += f"💬 {expl}\n"
-#         msg += "\n"
-
-#     total = len(safe) + len(value)
-#     msg += f"💰 Всего: {total} {'ставка' if total==1 else 'ставки' if total<5 else 'ставок'}"
-
-#     await update.message.reply_text(msg, parse_mode=ParseMode.HTML)
 async def today(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     lines = text.splitlines()
@@ -419,8 +357,37 @@ async def process_today_lines(update: Update, context: ContextTypes.DEFAULT_TYPE
     total = len(safe) + len(value)
     msg += f"💰 Всего: {total} {'ставка' if total==1 else 'ставки' if total<5 else 'ставок'}"
 
+    if not safe and not value:
+        await update.message.reply_text("⚠️ Ни одна ставка не распознана. Убедись, что используешь формат:\n\nNaVi vs G2 – победа G2 @1.85\nКомментарий")
+        return
+
     await update.message.reply_text(msg, parse_mode=ParseMode.HTML)
 
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+async def prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    keyboard = [[InlineKeyboardButton("💡 Получить промпт", callback_data="send_prompt")]]
+    await update.message.reply_text(
+        "Нажми кнопку ниже, чтобы получить промпт для ChatGPT:",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+async def prompt_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    prompt_text = (
+        "Найди 0–2 максимально надёжные #safe ставки (коэффициенты от 1.10 до 1.20) и 0–5 логичных "
+        "value-ставок (коэффициенты от 1.60 до 2.50) на сегодня по CS2, футболу и хоккею. "
+        "Если есть действительно ценные ставки в других дисциплинах — тоже включи.\n\n"
+        "Формат каждой ставки:\n"
+        "Команда1 vs Команда2 – исход @коэффициент\n"
+        "Краткое пояснение, почему ставка логична.\n"
+        "(Можно добавить ещё одну строку пояснения, если важно.)\n\n"
+        "❗️Не добавляй текст до и после. Только список в формате выше."
+    )
+
+    await query.message.reply_text(prompt_text)
 
 
 #endregion
@@ -786,6 +753,10 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler("users_count", users_count))
     app.add_handler(CommandHandler("graph", graph))
     app.add_handler(CommandHandler("export", export))
+
+    app.add_handler(CommandHandler("prompt", prompt))
+    app.add_handler(CallbackQueryHandler(prompt_button_handler, pattern="^send_prompt$"))
+
 
     app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, bet_step_handler))
