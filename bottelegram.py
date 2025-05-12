@@ -772,7 +772,7 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler("bank", bank_command))
     app.add_handler(CommandHandler("bet", bet))
     app.add_handler(CommandHandler("cancel", cancel))
-
+    app.add_handler(CommandHandler("today", today))
     app.add_handler(CommandHandler("delete", delete))
     app.add_handler(CommandHandler("undelete", undelete))
     app.add_handler(CommandHandler("pending", pending))
