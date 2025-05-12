@@ -109,15 +109,20 @@ async def bet_step_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif step == "reminder":
         answer = update.message.text.strip().lower()
         match = context.user_data["match"]
+        now = datetime.datetime.now(LATVIA_TZ)
+
         if answer in ["нет", "no"]:
             reminder_time = None
         else:
             try:
-                now = datetime.datetime.now(LATVIA_TZ)
                 dt = datetime.datetime.strptime(answer, "%d.%m %H:%M").replace(tzinfo=LATVIA_TZ)
                 if dt < now:
-                    await update.message.reply_text("⚠️ Указанное время уже прошло. Напоминание не установлено.")
-                    context.user_data.clear()
+                    await update.message.reply_text(
+                        f"⚠️ Указанное время уже прошло. Напоминание не установлено.\n"
+                        f"Сейчас: <b>{now.strftime('%d.%m %H:%M')}</b>\n"
+                        f"Попробуй снова или напиши <b>нет</b>.",
+                        parse_mode="HTML"
+                    )
                     return
                 reminder_time = dt.isoformat()
             except:
@@ -129,7 +134,7 @@ async def bet_step_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "amount": context.user_data["amount"],
             "coeff": context.user_data["coeff"],
             "status": "pending",
-            "time": datetime.datetime.now(LATVIA_TZ),
+            "time": now,
             "type": (
                 "safe" if context.user_data["coeff"] <= 1.20 else
                 "value" if 1.60 <= context.user_data["coeff"] <= 2.50 else
