@@ -192,6 +192,34 @@ async def bet_step_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = get_user(chat_id)
     step = context.user_data.get("bet_step")
 
+    if context.user_data.get("awaiting_reminder_time"):
+        context.user_data.pop("awaiting_reminder_time")
+        match = context.user_data.pop("last_match", "неизвестный матч")
+        answer = update.message.text.strip().lower()
+
+        if answer in ["нет", "no"]:
+            await update.message.reply_text("🕑 Напоминание не установлено.")
+            return
+
+        try:
+            dt = datetime.datetime.strptime(answer, "%d.%m %H:%M")
+            now = datetime.datetime.now()
+            if dt < now:
+                await update.message.reply_text("⚠️ Указанное время уже прошло. Напоминание не установлено.")
+                return
+
+            delta = dt - now
+            context.application.job_queue.run_once(
+                remind_result,
+                when=delta,
+                data={"chat_id": chat_id, "match": match}
+            )
+            await update.message.reply_text(f"🔔 Напоминание установлено на {dt.strftime('%d.%m %H:%M')}")
+        except:
+            await update.message.reply_text("⚠️ Неверный формат. Используй ДД.ММ ЧЧ:ММ, например: 12.05 18:45")
+        return
+
+
     if step == "match":
         context.user_data["match"] = update.message.text.strip()
         context.user_data["bet_step"] = "platform"
@@ -245,7 +273,7 @@ async def bet_step_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             else:
                 bet_type = "normal"
 
-            user["bets"].append({
+            bet = {
                 "match": match,
                 "amount": amount,
                 "coeff": coeff,
@@ -253,24 +281,26 @@ async def bet_step_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "time": bet_time,
                 "type": bet_type,
                 "source": platform
-            })
+            }
 
+            user["bets"].append(bet)
             user["banks"][platform] -= amount
-            context.user_data.clear()
             save_data()
 
-            context.application.job_queue.run_once(
-                remind_result,
-                when=datetime.timedelta(hours=24),
-                data={"chat_id": chat_id, "match": match}
-            )
+            # сохраняем ставку и ждём время для напоминания
+            context.user_data["awaiting_reminder_time"] = True
+            context.user_data["last_match"] = match
 
             await update.message.reply_text(
                 f"✅ Ставка добавлена: {match}, {amount}€, кэф {coeff} ({'#' + bet_type})\n"
-                f"💰 Банк {platform}: {user['banks'][platform]:.2f}€"
+                f"💰 Банк {platform}: {user['banks'][platform]:.2f}€\n\n"
+                f"🔔 Хочешь установить напоминание о проверке этой ставки?\n"
+                f"Введи дату и время в формате: <b>ДД.ММ ЧЧ:ММ</b>\n"
+                f"Или напиши <b>нет</b>, если не нужно.", parse_mode="HTML"
             )
         except:
             await update.message.reply_text("⚠️ Введи корректный коэффициент.")
+
 
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
