@@ -5,7 +5,7 @@ import datetime  # ← вот эта строка
 
 
 # Импортируем хендлеры из модулей (после их создания)
-from handlers.core import start, info, bank_command, users_count, admin_backup_push, admin_download
+from handlers.core import start, info, bank_command, users_count, admin_download
 
 from handlers.betting import bet, cancel, pending,  bet_step_handler
 from handlers.today import today, prompt, prompt_button_handler
