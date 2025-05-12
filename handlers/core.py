@@ -9,22 +9,6 @@ import os
 # Замените на свой Telegram ID
 ADMIN_ID = 2047828228  # ← поставь сюда свой chat_id
 
-# /admin_backup — экспорт users_data.json вручную
-async def admin_backup(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
-        await update.message.reply_text("⛔️ У тебя нет доступа к этой команде.")
-        return
-
-    filename = "users_data_backup.json"
-    with open(filename, "w", encoding="utf-8") as f:
-        json.dump(users_data, f, indent=2, ensure_ascii=False, default=str)
-
-    await update.message.reply_document(
-        document=open(filename, "rb"),
-        filename=filename,
-        caption="📄 Резервная копия users_data"
-    )
-
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = str(update.effective_chat.id)
 
@@ -65,6 +49,22 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ Неверный логин или пароль. Попробуй ещё раз.")
             context.user_data.clear()
             
+
+# /admin_backup — экспорт users_data.json вручную
+async def admin_backup(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        await update.message.reply_text("⛔️ У тебя нет доступа к этой команде.")
+        return
+
+    filename = "users_data_backup.json"
+    with open(filename, "w", encoding="utf-8") as f:
+        json.dump(users_data, f, indent=2, ensure_ascii=False, default=str)
+
+    await update.message.reply_document(
+        document=open(filename, "rb"),
+        filename=filename,
+        caption="📄 Резервная копия users_data"
+    )
 
 
 async def info(update: Update, context: ContextTypes.DEFAULT_TYPE):
