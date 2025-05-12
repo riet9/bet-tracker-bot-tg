@@ -14,11 +14,11 @@ from telegram.ext import (
 )
 from dotenv import load_dotenv
 from datetime import datetime
-import pytz
+from zoneinfo import ZoneInfo
 
 load_dotenv()
 TOKEN = os.getenv("BOT_TOKEN")
-LATVIA_TZ = pytz.timezone("Europe/Riga")
+LATVIA_TZ = ZoneInfo.timezone("Europe/Riga")
 
 # Настройка логов
 logging.basicConfig(
