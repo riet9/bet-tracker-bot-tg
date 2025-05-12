@@ -1,6 +1,8 @@
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters
 from dotenv import load_dotenv
 import os
+import datetime  # ← вот эта строка
+
 
 # Импортируем хендлеры из модулей (после их создания)
 from handlers.core import start, info, bank_command, users_count
