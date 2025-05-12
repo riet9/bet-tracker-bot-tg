@@ -28,17 +28,20 @@ def save_data():
         if os.path.exists(DATA_FILE):
             with open(DATA_FILE, "r", encoding="utf-8") as original:
                 content = original.read()
-            with open("/mnt/data/data_backup.json", "w", encoding="utf-8") as backup:
+            with open("data/data_backup.json", "w", encoding="utf-8") as backup:
                 backup.write(content)
+
+            # Копируем также в GitHub-папку
+            os.makedirs("backups", exist_ok=True)
+            with open("backups/users_data.json", "w", encoding="utf-8") as f_backup:
+                f_backup.write(content)
+
     except Exception as e:
         print(f"[WARN] Не удалось создать резервную копию: {e}")
 
-    try:
-        with open(DATA_FILE, "w", encoding="utf-8") as f:
-            json.dump(users_data, f, indent=2, ensure_ascii=False, default=str)
-        print("[INFO] Данные сохранены.")
-    except Exception as e:
-        print(f"[ERROR] Ошибка при сохранении: {e}")
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(users_data, f, indent=2, ensure_ascii=False, default=str)
+
 
 def get_user(chat_id: str):
     chat_id = str(chat_id)

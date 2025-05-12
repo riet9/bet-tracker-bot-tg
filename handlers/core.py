@@ -5,6 +5,7 @@ from auth_config import ALLOWED_USERS
 from utils.storage import get_user, save_data, users_data
 import json
 import os
+import subprocess
 
 # Замените на свой Telegram ID
 ADMIN_ID = 2047828228  # ← поставь сюда свой chat_id
@@ -97,6 +98,22 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ Неверный логин или пароль. Попробуй снова.")
             context.user_data.clear()
 
+
+
+async def admin_backup_push(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        await update.message.reply_text("⛔️ У тебя нет доступа.")
+        return
+
+    try:
+        subprocess.run(["git", "add", "backups/users_data.json"], check=True)
+        subprocess.run(["git", "commit", "-m", "Auto backup"], check=True)
+        subprocess.run(["git", "push"], check=True)
+        await update.message.reply_text("✅ Бэкап запушен в GitHub.")
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ Ошибка при push: {e}")
+
+"""
 # /admin_backup — экспорт users_data.json вручную
 async def admin_backup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
@@ -112,7 +129,7 @@ async def admin_backup(update: Update, context: ContextTypes.DEFAULT_TYPE):
         filename=filename,
         caption="📄 Резервная копия users_data"
     )
-
+"""
 
 async def info(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(

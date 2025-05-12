@@ -53,7 +53,7 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler("top_teams", top_teams))
     app.add_handler(CommandHandler("review", review))
     
-
+    app.add_handler(CommandHandler("admin_backup_push", admin_backup_push))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, auth_handler))
     # app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, bet_step_handler))
     app.add_handler(CallbackQueryHandler(button_handler))
