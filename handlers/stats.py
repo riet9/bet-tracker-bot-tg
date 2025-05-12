@@ -42,23 +42,25 @@ async def summary(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = get_user(chat_id)
     banks = user["banks"]
     now = datetime.datetime.now()
-    period = context.args[0] if context.args else "today"
 
-    if period == "today":
-        filtered = [b for b in user["bets"] if datetime.datetime.fromisoformat(b["time"]).date() == now.date()]
+    # Получаем аргумент
+    arg = context.args[0] if context.args else "today"
+    period = 1
+    label = "Сегодня"
+
+    # Определяем период
+    if arg.endswith("d") and arg[:-1].isdigit():
+        period = int(arg[:-1])
+        label = f"За {period} дней"
+    elif arg == "today":
+        period = 1
         label = "Сегодня"
-    elif period == "7d":
-        cutoff = now - datetime.timedelta(days=7)
-        filtered = [b for b in user["bets"] if datetime.datetime.fromisoformat(b["time"]) >= cutoff]
-        label = "За 7 дней"
-    elif period == "30d":
-        cutoff = now - datetime.timedelta(days=30)
-        filtered = [b for b in user["bets"] if datetime.datetime.fromisoformat(b["time"]) >= cutoff]
-        label = "За 30 дней"
     else:
         await update.message.reply_text("❌ Используй:\n/summary, /summary 7d, /summary 30d")
         return
 
+    cutoff = now - datetime.timedelta(days=period)
+    filtered = [b for b in user["bets"] if datetime.datetime.fromisoformat(b["time"]) >= cutoff]
     completed = [b for b in filtered if b["status"] != "pending"]
     wins = [b for b in completed if b["status"] == "win"]
     losses = [b for b in completed if b["status"] == "lose"]
@@ -76,6 +78,7 @@ async def summary(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"📊 Всего банк: {total_bank:.2f}€",
         parse_mode=ParseMode.HTML
     )
+
 
 # /history — история ставок по типу
 async def history(update: Update, context: ContextTypes.DEFAULT_TYPE):
