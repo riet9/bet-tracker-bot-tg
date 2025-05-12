@@ -14,7 +14,7 @@ from utils.storage import load_data
 from handlers.reminders import morning_reminder
 from handlers.goal import goal
 from handlers.analysis import top_teams, review
-
+from handlers.auth import auth_handler
 
 
 load_dotenv()
@@ -30,6 +30,7 @@ if __name__ == '__main__':
     )
 
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, start))
     app.add_handler(CommandHandler("info", info))
     app.add_handler(CommandHandler("bank", bank_command))
     app.add_handler(CommandHandler("bet", bet))
@@ -51,9 +52,10 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler("goal", goal))
     app.add_handler(CommandHandler("top_teams", top_teams))
     app.add_handler(CommandHandler("review", review))
+    
 
-    app.add_handler(CallbackQueryHandler(prompt_button_handler, pattern="^send_prompt$"))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, auth_handler))
+    # app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, bet_step_handler))
     app.add_handler(CallbackQueryHandler(button_handler))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, bet_step_handler))
 
     app.run_polling()

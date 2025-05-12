@@ -9,6 +9,7 @@ import os
 # Замените на свой Telegram ID
 ADMIN_ID = 2047828228  # ← поставь сюда свой chat_id
 
+"""
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = str(update.effective_chat.id)
 
@@ -48,7 +49,53 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await update.message.reply_text("❌ Неверный логин или пароль. Попробуй ещё раз.")
             context.user_data.clear()
-            
+    """
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = str(update.effective_chat.id)
+
+    # Уже авторизован
+    if context.user_data.get("authorized"):
+        await update.message.reply_text("✅ Ты уже авторизован.")
+        return
+
+    # Если не начат процесс авторизации — спрашиваем логин
+    if "auth_step" not in context.user_data:
+        context.user_data["auth_step"] = "login"
+        await update.message.reply_text("👤 Введи свой логин:")
+        return
+
+    step = context.user_data["auth_step"]
+
+    if step == "login":
+        context.user_data["login_attempt"] = update.message.text.strip()
+        context.user_data["auth_step"] = "password"
+        await update.message.reply_text("🔑 Введи пароль:")
+        return
+
+    if step == "password":
+        login = context.user_data.get("login_attempt", "")
+        password = update.message.text.strip()
+
+        if login in ALLOWED_USERS and ALLOWED_USERS[login] == password:
+            context.user_data["authorized"] = True
+            context.user_data["login"] = login
+
+            user = get_user(chat_id)
+            user["login"] = login
+            save_data()
+
+            context.user_data.pop("auth_step", None)
+            context.user_data.pop("login_attempt", None)
+
+            await update.message.reply_text(f"✅ Привет, {login}!\nТы успешно авторизован.")
+            await update.message.reply_text(
+                "Напиши /bet чтобы добавить ставку.\n"
+                "Или /info, чтобы узнать, что я умею."
+            )
+        else:
+            await update.message.reply_text("❌ Неверный логин или пароль. Попробуй снова.")
+            context.user_data.clear()
 
 # /admin_backup — экспорт users_data.json вручную
 async def admin_backup(update: Update, context: ContextTypes.DEFAULT_TYPE):
