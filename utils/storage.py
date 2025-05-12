@@ -2,7 +2,7 @@ import json
 import os
 from zoneinfo import ZoneInfo
 
-# 📁 Файл Railway
+# Railway persistent storage
 DATA_FILE = "/mnt/data/users_data.json"
 LATVIA_TZ = ZoneInfo("Europe/Riga")
 users_data = {}
@@ -16,12 +16,14 @@ def load_data():
     except FileNotFoundError:
         users_data = {}
         print("[INFO] Новый файл данных создан.")
+        save_data()  # сразу сохраняем начальную структуру
     except Exception as e:
         users_data = {}
         print(f"[ERROR] Ошибка при загрузке: {e}")
 
 def save_data():
     try:
+        os.makedirs(os.path.dirname(DATA_FILE), exist_ok=True)  # ← создаём /mnt/data, если нужно
         with open(DATA_FILE, "w", encoding="utf-8") as f:
             json.dump(users_data, f, indent=2, ensure_ascii=False, default=str)
     except Exception as e:
@@ -51,7 +53,3 @@ def get_user(chat_id: str):
             }
             user.pop("bank", None)
     return users_data[chat_id]
-
-# 🔁 Создание файла, если его не было
-if not os.path.exists(DATA_FILE):
-    save_data()

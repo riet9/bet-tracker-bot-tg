@@ -5,7 +5,7 @@ import datetime  # ← вот эта строка
 
 
 # Импортируем хендлеры из модулей (после их создания)
-from handlers.core import start, info, bank_command, users_count, admin_download
+from handlers.core import start, info, bank_command,admin_download, users_count
 
 from handlers.betting import bet, cancel, pending,  bet_step_handler
 from handlers.today import today, prompt, prompt_button_handler
@@ -31,7 +31,7 @@ if __name__ == '__main__':
     )
 
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, start))
+    # app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, start))
     app.add_handler(CommandHandler("info", info))
     app.add_handler(CommandHandler("bank", bank_command))
     app.add_handler(CommandHandler("bet", bet))

@@ -101,6 +101,22 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def admin_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
+        await update.message.reply_text("⛔️ У тебя нет доступа.")
+        return
+
+    if not os.path.exists(DATA_FILE):
+        await update.message.reply_text("⚠️ Не удалось отправить файл: файл не найден.")
+        return
+
+    await update.message.reply_document(
+        document=open(DATA_FILE, "rb"),
+        filename="users_data.json",
+        caption="📄 Актуальный сейв"
+    )
+
+"""
+async def admin_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
         await update.message.reply_text("⛔️ Нет доступа.")
         return
 
@@ -112,7 +128,7 @@ async def admin_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     except Exception as e:
         await update.message.reply_text(f"⚠️ Не удалось отправить файл: {e}")
-
+"""
 
 async def info(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
