@@ -344,6 +344,68 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         save_data()
         await query.edit_message_text(msg + f"\n💰 Новый банк: {user['bank']:.2f}€")
 
+async def history(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = str(update.effective_chat.id)
+    user = get_user(chat_id)
+
+    if not context.args:
+        await update.message.reply_text("ℹ️ Пример использования:\n/history #safe или /history #value")
+        return
+
+    bet_type = context.args[0].lstrip("#").lower()
+    if bet_type not in ["safe", "value", "normal"]:
+        await update.message.reply_text("❌ Неверный тип. Доступны: #safe, #value, #normal")
+        return
+
+    filtered = [b for b in user["bets"] if b.get("type") == bet_type and b["status"] != "pending"]
+    if not filtered:
+        await update.message.reply_text(f"📭 Нет завершённых #{bet_type} ставок.")
+        return
+
+    message = f"📖 <b>История #{bet_type} ставок:</b>\n\n"
+    for b in filtered[-10:]:  # последние 10
+        dt = datetime.datetime.fromisoformat(b["time"]) if isinstance(b["time"], str) else b["time"]
+        status = "✅" if b["status"] == "win" else "❌"
+        message += f"{status} {b['match']} — {b['amount']}€ @ {b['coeff']} ({dt.strftime('%d.%m %H:%M')})\n"
+
+    await update.message.reply_text(message, parse_mode="HTML")
+
+async def summary(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = str(update.effective_chat.id)
+    user = get_user(chat_id)
+
+    now = datetime.datetime.now()
+    period = context.args[0] if context.args else "today"
+
+    if period == "today":
+        filtered = [b for b in user["bets"] if datetime.datetime.fromisoformat(b["time"]).date() == now.date()]
+        label = "Сегодня"
+    elif period == "7d":
+        cutoff = now - datetime.timedelta(days=7)
+        filtered = [b for b in user["bets"] if datetime.datetime.fromisoformat(b["time"]) >= cutoff]
+        label = "За 7 дней"
+    elif period == "30d":
+        cutoff = now - datetime.timedelta(days=30)
+        filtered = [b for b in user["bets"] if datetime.datetime.fromisoformat(b["time"]) >= cutoff]
+        label = "За 30 дней"
+    else:
+        await update.message.reply_text("❌ Используй:\n/summary, /summary 7d, /summary 30d")
+        return
+
+    completed = [b for b in filtered if b["status"] != "pending"]
+    wins = [b for b in completed if b["status"] == "win"]
+    losses = [b for b in completed if b["status"] == "lose"]
+    profit = sum((b["amount"] * b["coeff"] - b["amount"]) if b["status"] == "win" else -b["amount"] for b in completed)
+
+    await update.message.reply_text(
+        f"📆 <b>{label}:</b>\n"
+        f"📋 Ставок: {len(filtered)} (завершено: {len(completed)})\n"
+        f"✅ Победы: {len(wins)} | ❌ Поражения: {len(losses)}\n"
+        f"💸 Прибыль: {profit:.2f}€\n"
+        f"💰 Банк: {user['bank']:.2f}€",
+        parse_mode="HTML"
+    )
+
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = str(update.effective_chat.id)
     user = get_user(chat_id)
@@ -367,8 +429,7 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"💸 Сумма ставок: {total_bets:.2f}€\n"
         f"📥 ROI: {roi:.2f}€"
     )
-
-
+    
 async def show_type_stats(update: Update, context: ContextTypes.DEFAULT_TYPE, bet_type: str):
     chat_id = str(update.effective_chat.id)
     user = get_user(chat_id)
@@ -487,6 +548,8 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler("delete", delete))
     app.add_handler(CommandHandler("undelete", undelete))
     app.add_handler(CommandHandler("pending", pending))
+    app.add_handler(CommandHandler("history", history))
+    app.add_handler(CommandHandler("summary", summary))
     app.add_handler(CommandHandler("result", result))
     app.add_handler(CommandHandler("stats", stats))
     app.add_handler(CommandHandler("safe_stats", safe_stats))
