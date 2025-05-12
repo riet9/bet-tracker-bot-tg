@@ -53,8 +53,27 @@ def save_data():
 def get_user(chat_id: str):
     chat_id = str(chat_id)
     if chat_id not in users_data:
-        users_data[chat_id] = {"bank": 10.0, "bets": []}
+        users_data[chat_id] = {
+            "banks": {
+                "optibet": 0.0,
+                "olybet": 0.0,
+                "bonus": 0.0
+            },
+            "bets": []
+        }
+    else:
+        # Миграция старых данных (если был "bank")
+        user = users_data[chat_id]
+        if "banks" not in user:
+            old_bank = user.get("bank", 0.0)
+            user["banks"] = {
+                "optibet": old_bank,
+                "olybet": 0.0,
+                "bonus": 0.0
+            }
+            user.pop("bank", None)
     return users_data[chat_id]
+
 #endregion
 
 #region Команды интерфейса (/start, /info, /bank, /users_count)
@@ -113,19 +132,37 @@ async def info(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def bank_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = str(update.effective_chat.id)
     user = get_user(chat_id)
-    if context.args:
+    banks = user["banks"]
+
+    if len(context.args) == 2:
+        name, amount_str = context.args
+        name = name.lower()
+        if name not in banks:
+            await update.message.reply_text("❌ Укажи банк: optibet, olybet или bonus.")
+            return
         try:
-            new_bank = float(context.args[0])
-            if new_bank < 0:
-                await update.message.reply_text("⚠️ Банк не может быть отрицательным.")
+            amount = float(amount_str)
+            if amount < 0:
+                await update.message.reply_text("⚠️ Сумма не может быть отрицательной.")
                 return
-            user["bank"] = new_bank
+            banks[name] = amount
             save_data()
-            await update.message.reply_text(f"✅ Новый банк установлен: {new_bank:.2f}€")
+            await update.message.reply_text(f"✅ Установлено: {name} = {amount:.2f}€")
         except:
-            await update.message.reply_text("⚠️ Введи число. Пример:\n/bank 15")
+            await update.message.reply_text("⚠️ Введи корректную сумму.")
+    elif len(context.args) == 0:
+        total = sum(banks.values())
+        msg = (
+            f"💰 Банки:\n"
+            f"🏦 Optibet: {banks['optibet']:.2f}€\n"
+            f"🏦 Olybet: {banks['olybet']:.2f}€\n"
+            f"🎁 Бонусы: {banks['bonus']:.2f}€\n"
+            f"📊 Всего: {total:.2f}€"
+        )
+        await update.message.reply_text(msg)
     else:
-        await update.message.reply_text(f"💰 Текущий банк: {user['bank']:.2f}€")
+        await update.message.reply_text("⚠️ Используй:\n/bank optibet 20 или просто /bank")
+
 
 async def users_count(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"👥 Всего пользователей: {len(users_data)}")
@@ -157,6 +194,15 @@ async def bet_step_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if step == "match":
         context.user_data["match"] = update.message.text.strip()
+        context.user_data["bet_step"] = "platform"
+        await update.message.reply_text("Выбери платформу (optibet / olybet / bonus):")
+
+    elif step == "platform":
+        platform = update.message.text.lower().strip()
+        if platform not in ["optibet", "olybet", "bonus"]:
+            await update.message.reply_text("❌ Введи: optibet, olybet или bonus.")
+            return
+        context.user_data["platform"] = platform
         context.user_data["bet_step"] = "amount"
         await update.message.reply_text("Введи сумму ставки в € (например: 2.5)")
 
@@ -166,17 +212,19 @@ async def bet_step_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if amount <= 0:
                 await update.message.reply_text("⚠️ Сумма должна быть больше 0.")
                 return
-            if amount > user["bank"]:
-                await update.message.reply_text(f"⚠️ У тебя только {user['bank']:.2f}€.")
+            platform = context.user_data["platform"]
+            if amount > user["banks"][platform]:
+                await update.message.reply_text(f"⚠️ У тебя только {user['banks'][platform]:.2f}€ на {platform}.")
                 return
             context.user_data["amount"] = amount
             context.user_data["bet_step"] = "coeff"
 
-            percentage = (amount / user["bank"]) * 100
-            warning = f"\n⚠️ Это {percentage:.1f}% от банка. Уверен?" if percentage >= 20 else ""
+            percentage = (amount / user["banks"][platform]) * 100
+            warning = f"\n⚠️ Это {percentage:.1f}% от банка {platform}. Уверен?" if percentage >= 20 else ""
             await update.message.reply_text(f"Введи коэффициент (например: 1.85){warning}")
         except:
             await update.message.reply_text("⚠️ Введи корректное число.")
+
 
     elif step == "coeff":
         try:
@@ -187,6 +235,7 @@ async def bet_step_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             match = context.user_data["match"]
             amount = context.user_data["amount"]
+            platform = context.user_data["platform"]
             bet_time = datetime.datetime.now()
 
             if coeff <= 1.20:
@@ -202,10 +251,11 @@ async def bet_step_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "coeff": coeff,
                 "status": "pending",
                 "time": bet_time,
-                "type": bet_type
+                "type": bet_type,
+                "source": platform
             })
 
-            user["bank"] -= amount
+            user["banks"][platform] -= amount
             context.user_data.clear()
             save_data()
 
@@ -217,10 +267,11 @@ async def bet_step_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             await update.message.reply_text(
                 f"✅ Ставка добавлена: {match}, {amount}€, кэф {coeff} ({'#' + bet_type})\n"
-                f"💰 Новый банк: {user['bank']:.2f}€"
+                f"💰 Банк {platform}: {user['banks'][platform]:.2f}€"
             )
         except:
             await update.message.reply_text("⚠️ Введи корректный коэффициент.")
+
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if "bet_step" in context.user_data:
@@ -475,17 +526,19 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text("Ставка уже завершена.")
             return
 
+        source = bet.get("source", "optibet")  # на всякий случай default
         if data == "win":
             profit = bet["amount"] * bet["coeff"]
-            user["bank"] += profit
+            user["banks"][source] += profit
             bet["status"] = "win"
-            msg = f"✅ Победа: {bet['match']}\n+{profit:.2f}€"
+            msg = f"✅ Победа: {bet['match']} ({source})\n+{profit:.2f}€"
         else:
             bet["status"] = "lose"
-            msg = f"❌ Поражение: {bet['match']}\n-{bet['amount']:.2f}€"
+            msg = f"❌ Поражение: {bet['match']} ({source})\n-{bet['amount']:.2f}€"
 
         save_data()
-        await query.edit_message_text(msg + f"\n💰 Новый банк: {user['bank']:.2f}€")
+        await query.edit_message_text(msg + f"\n💰 Новый банк {source}: {user['banks'][source]:.2f}€")
+
         
 async def remind_result(context: ContextTypes.DEFAULT_TYPE):
     data = context.job.data

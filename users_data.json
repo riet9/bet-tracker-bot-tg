@@ -1,1 +1,9 @@
-{}
+{
+  "banks": {
+    "optibet": 10.0,
+    "olybet": 10.0,
+    "bonus": 0.0
+  },
+  "bets": []
+}
+
