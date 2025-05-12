@@ -32,6 +32,17 @@ def load_data():
         users_data = {}
 
 def save_data():
+    # Создаём резервную копию
+    try:
+        if os.path.exists(DATA_FILE):
+            with open(DATA_FILE, "r") as original:
+                content = original.read()
+            with open("data_backup.json", "w") as backup:
+                backup.write(content)
+    except Exception as e:
+        print(f"[WARN] Не удалось создать резервную копию: {e}")
+
+    # Сохраняем новые данные
     with open(DATA_FILE, "w") as f:
         json.dump(users_data, f, indent=2, default=str)
 
@@ -53,23 +64,41 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def info(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "📘 <b>Список доступных команд:</b>\n\n"
-        "👤 У тебя личный профиль — ставки и банк видны только тебе\n\n"
-        "🟢 /start — запустить бота\n"
-        "🟢 /bet — добавить ставку по шагам (матч, сумма, кэф)\n"
-        "🟢 /result — ввести результат ставки (✅/❌)\n"
-        "🟢 /stats — твоя статистика (winrate, ROI, банк)\n"
-        "🟢 /graph — график роста банка\n"
-        "🟢 /summary — дневной/недельный/месячный отчёт\n"
-        "🟢 /safe_stats, /value_stats — аналитика по типу ставок\n"
-        "🟢 /top_type — сравнение стратегий\n"
-        "🟢 /history #safe — история ставок по типу\n"
-        "🟢 /bank [сумма] — установить или узнать банк\n"
-        "🟢 /export — экспортировать историю в .csv\n"
-        "🟢 /users_count — сколько человек использует бота\n"
-        "🟢 /cancel — отменить ввод ставки\n",
+        "📘 <b>Список доступных команд:</b>\n"
+        "👤 У тебя личный профиль — все ставки и банк видны только тебе\n\n"
+
+        "🎯 <b>Ставки и результаты:</b>\n"
+        "🟢 <b>/bet</b> — добавить ставку (по шагам)\n"
+        "🟢 <b>/result</b> — завершить ставку (✅ победа / ❌ поражение)\n"
+        "🟢 <b>/delete</b> — удалить активную ставку и вернуть деньги\n"
+        "🟢 <b>/undelete</b> — восстановить удалённую ставку\n"
+        "🟢 <b>/pending</b> — список текущих активных ставок\n\n"
+
+        "📊 <b>Статистика и аналитика:</b>\n"
+        "🟢 <b>/stats</b> — общая статистика (банк, winrate, ROI)\n"
+        "🟢 <b>/graph</b> — график роста банка\n"
+        "🟢 <b>/safe_stats</b> — аналитика по #safe ставкам\n"
+        "🟢 <b>/value_stats</b> — аналитика по #value ставкам\n"
+        "🟢 <b>/top_type</b> — сравнение стратегий (#safe vs #value)\n"
+        "🟢 <b>/history #type</b> — история ставок по типу\n"
+        "🟢 <b>/summary</b> — отчёт за сегодня\n"
+        "🟢 <b>/summary 7d</b> — за 7 дней\n"
+        "🟢 <b>/summary 30d</b> — за месяц\n\n"
+
+        "📁 <b>Файл и банк:</b>\n"
+        "🟢 <b>/export</b> — сохранить ставки в CSV\n"
+        "🟢 <b>/bank [сумма]</b> — установить или узнать банк\n\n"
+
+        "⚙️ <b>Служебные:</b>\n"
+        "🟢 <b>/info</b> — показать это меню\n"
+        "🟢 <b>/cancel</b> — отменить добавление ставки\n"
+        "🟢 <b>/users_count</b> — сколько человек использует бота\n\n"
+
+        "💾 Все данные сохраняются автоматически между перезапусками.\n"
+        "💬 Просто используй команды или следуй пошаговым подсказкам.",
         parse_mode="HTML"
     )
+
 
 async def bank_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = str(update.effective_chat.id)
@@ -91,6 +120,63 @@ async def bank_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["bet_step"] = "match"
     await update.message.reply_text("Введи название матча (пример: NaVi vs G2)")
+
+async def delete(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = str(update.effective_chat.id)
+    user = get_user(chat_id)
+
+    keyboard = []
+    for i, b in enumerate(user["bets"]):
+        if b["status"] == "pending":
+            keyboard.append([InlineKeyboardButton(
+                f"{b['match']} ({b['amount']}€ @ {b['coeff']})", callback_data=f"del_{i}"
+            )])
+
+    if not keyboard:
+        await update.message.reply_text("❌ Нет активных ставок для удаления.")
+        return
+
+    await update.message.reply_text(
+        "🗑️ Выбери ставку для удаления:",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+async def undelete(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = str(update.effective_chat.id)
+    user = get_user(chat_id)
+
+    keyboard = []
+    for i, b in enumerate(user["bets"]):
+        if b["status"] == "deleted":
+            keyboard.append([InlineKeyboardButton(
+                f"{b['match']} ({b['amount']}€ @ {b['coeff']})", callback_data=f"undel_{i}"
+            )])
+
+    if not keyboard:
+        await update.message.reply_text("📦 Нет удалённых ставок для восстановления.")
+        return
+
+    await update.message.reply_text(
+        "♻️ Выбери ставку для восстановления:",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+async def pending(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = str(update.effective_chat.id)
+    user = get_user(chat_id)
+
+    pending_bets = [b for b in user["bets"] if b["status"] == "pending"]
+    if not pending_bets:
+        await update.message.reply_text("✅ Все ставки завершены!")
+        return
+
+    msg = "📋 <b>Твои активные ставки:</b>\n\n"
+    for i, b in enumerate(pending_bets, 1):
+        dt = datetime.datetime.fromisoformat(b["time"]) if isinstance(b["time"], str) else b["time"]
+        msg += f"{i}. {b['match']} — {b['amount']}€ @ {b['coeff']} ({dt.strftime('%d.%m %H:%M')})\n"
+
+    await update.message.reply_text(msg, parse_mode="HTML")
+
 
 async def bet_step_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = str(update.effective_chat.id)
@@ -201,7 +287,43 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]]
         await query.edit_message_text(f"Выбрана ставка: {user['bets'][index]['match']}",
                                       reply_markup=InlineKeyboardMarkup(keyboard))
+    
+    elif data.startswith("del_"):
+        index = int(data.split("_")[1])
+        if index >= len(user["bets"]) or user["bets"][index]["status"] != "pending":
+            await query.edit_message_text("⚠️ Ставка не найдена или уже завершена.")
+            return
 
+        user["bank"] += user["bets"][index]["amount"]
+        user["bets"][index]["status"] = "deleted"
+        save_data()
+
+        await query.edit_message_text(
+            f"❌ Ставка удалена: {user['bets'][index]['match']}\n"
+            f"💰 Деньги возвращены: {user['bets'][index]['amount']}€\n"
+            f"Банк: {user['bank']:.2f}€"
+        )
+
+    elif data.startswith("undel_"):
+        index = int(data.split("_")[1])
+        if index >= len(user["bets"]) or user["bets"][index]["status"] != "deleted":
+            await query.edit_message_text("⚠️ Нельзя восстановить эту ставку.")
+            return
+
+        if user["bank"] < user["bets"][index]["amount"]:
+            await query.edit_message_text("⚠️ Недостаточно средств для восстановления.")
+            return
+
+        user["bank"] -= user["bets"][index]["amount"]
+        user["bets"][index]["status"] = "pending"
+        save_data()
+
+        await query.edit_message_text(
+            f"✅ Ставка восстановлена: {user['bets'][index]['match']}\n"
+            f"💸 {user['bets'][index]['amount']}€ снято\n"
+            f"Текущий банк: {user['bank']:.2f}€"
+        )
+    
     elif data in ["win", "lose"]:
         index = context.user_data.get("selected")
         if index is None: return
@@ -246,6 +368,83 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"📥 ROI: {roi:.2f}€"
     )
 
+
+async def show_type_stats(update: Update, context: ContextTypes.DEFAULT_TYPE, bet_type: str):
+    chat_id = str(update.effective_chat.id)
+    user = get_user(chat_id)
+
+    bets = [b for b in user["bets"] if b.get("type") == bet_type and b["status"] != "pending"]
+    if not bets:
+        await update.message.reply_text(f"📭 Нет завершённых #{bet_type} ставок.")
+        return
+
+    wins = [b for b in bets if b["status"] == "win"]
+    losses = [b for b in bets if b["status"] == "lose"]
+    total = len(bets)
+    roi = sum((b["amount"] * b["coeff"] - b["amount"]) if b["status"] == "win" else -b["amount"] for b in bets)
+    avg_coeff = sum(b["coeff"] for b in bets) / total
+    winrate = len(wins) / total * 100
+
+    await update.message.reply_text(
+        f"📊 <b>#{bet_type}</b> ставки:\n"
+        f"🎯 Завершено: {total}\n"
+        f"✅ Побед: {len(wins)} | ❌ Поражений: {len(losses)}\n"
+        f"📈 Winrate: {winrate:.1f}%\n"
+        f"📉 Средний кэф: {avg_coeff:.2f}\n"
+        f"📥 ROI: {roi:.2f}€",
+        parse_mode="HTML"
+    )
+
+async def safe_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await show_type_stats(update, context, "safe")
+async def value_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await show_type_stats(update, context, "value")
+
+async def top_type(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = str(update.effective_chat.id)
+    user = get_user(chat_id)
+
+    def stats_for(type_):
+        b = [x for x in user["bets"] if x.get("type") == type_ and x["status"] != "pending"]
+        if not b:
+            return None
+        wins = [x for x in b if x["status"] == "win"]
+        roi = sum((x["amount"] * x["coeff"] - x["amount"]) if x["status"] == "win" else -x["amount"] for x in b)
+        return {
+            "count": len(b),
+            "wins": len(wins),
+            "winrate": len(wins) / len(b) * 100,
+            "avg_coeff": sum(x["coeff"] for x in b) / len(b),
+            "roi": roi
+        }
+
+    s1 = stats_for("safe")
+    s2 = stats_for("value")
+
+    if not s1 and not s2:
+        await update.message.reply_text("⚠️ Нет завершённых #safe или #value ставок.")
+        return
+
+    def fmt(name, d):
+        return (
+            f"<b>#{name}</b>\n"
+            f"🎯 Завершено: {d['count']}, ✅ Побед: {d['wins']}\n"
+            f"📈 Winrate: {d['winrate']:.1f}%\n"
+            f"📉 Средний кэф: {d['avg_coeff']:.2f}\n"
+            f"📥 ROI: {d['roi']:.2f}€\n\n"
+        )
+
+    msg = "<b>📊 Сравнение стратегий:</b>\n\n"
+    if s1: msg += fmt("safe", s1)
+    if s2: msg += fmt("value", s2)
+
+    if s1 and s2:
+        better = "#safe" if s1["roi"] > s2["roi"] else "#value"
+        msg += f"🏆 <b>{better}</b> сейчас прибыльнее!"
+
+    await update.message.reply_text(msg, parse_mode="HTML")
+
+
 async def users_count(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"👥 Всего пользователей: {len(users_data)}")
 
@@ -285,8 +484,14 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler("info", info))
     app.add_handler(CommandHandler("bank", bank_command))
     app.add_handler(CommandHandler("bet", bet))
+    app.add_handler(CommandHandler("delete", delete))
+    app.add_handler(CommandHandler("undelete", undelete))
+    app.add_handler(CommandHandler("pending", pending))
     app.add_handler(CommandHandler("result", result))
     app.add_handler(CommandHandler("stats", stats))
+    app.add_handler(CommandHandler("safe_stats", safe_stats))
+    app.add_handler(CommandHandler("value_stats", value_stats))
+    app.add_handler(CommandHandler("top_type", top_type))
     app.add_handler(CommandHandler("users_count", users_count))
     app.add_handler(CommandHandler("graph", graph))
 
