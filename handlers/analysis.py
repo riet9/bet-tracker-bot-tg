@@ -5,6 +5,27 @@ from collections import Counter
 from utils.storage import get_user
 from utils.auth import require_auth
 
+# /mybets — показать все активные ставки
+@require_auth
+async def mybets(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = get_user(str(update.effective_chat.id))
+    active_bets = [b for b in user["bets"] if b["status"] == "pending"]
+
+    if not active_bets:
+        await update.message.reply_text("📭 У тебя нет активных ставок.")
+        return
+
+    msg = "📌 <b>Твои активные ставки:</b>\n\n"
+    for i, b in enumerate(active_bets, 1):
+        platform = b.get("source", "—")
+        bet_type = f"#{b.get('type', '—')}"
+        msg += (
+            f"{i}. {b['match']} — {b['amount']}€ @ {b['coeff']}\n"
+            f"   🕒 Источник: {platform} | Тип: {bet_type}\n\n"
+        )
+
+    await update.message.reply_text(msg, parse_mode=ParseMode.HTML)
+
 # /top_teams — показать топ команд по ставкам
 async def top_teams(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = get_user(str(update.effective_chat.id))
