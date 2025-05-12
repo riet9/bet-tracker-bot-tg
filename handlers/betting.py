@@ -2,8 +2,10 @@ from telegram import Update
 from telegram.ext import ContextTypes
 import datetime
 from utils.storage import get_user, save_data, LATVIA_TZ
+from utils.auth import require_auth
 
 # /bet (начало диалога)
+@require_auth
 async def bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["bet_step"] = "match"
     await update.message.reply_text("Введи название матча (пример: NaVi vs G2)")

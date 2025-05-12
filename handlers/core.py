@@ -1,6 +1,7 @@
 from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
+from auth_config import ALLOWED_USERS
 from utils.storage import get_user, save_data, users_data
 import json
 import os
@@ -26,13 +27,45 @@ async def admin_backup(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = str(update.effective_chat.id)
-    get_user(chat_id)
-    save_data()
-    await update.message.reply_text(
-        "👋 Привет! Я бот для отслеживания твоих ставок.\n"
-        "Напиши /bet чтобы добавить ставку.\n"
-        "Напиши /info, чтобы узнать, что я умею."
-    )
+
+    if "authorized" in context.user_data and context.user_data["authorized"]:
+        await update.message.reply_text("✅ Ты уже авторизован.")
+        return
+
+    if "auth_step" not in context.user_data:
+        context.user_data["auth_step"] = "login"
+        await update.message.reply_text("👤 Введи свой логин:")
+        return
+
+    step = context.user_data["auth_step"]
+    if step == "login":
+        context.user_data["login_attempt"] = update.message.text.strip()
+        context.user_data["auth_step"] = "password"
+        await update.message.reply_text("🔑 Введи пароль:")
+        return
+
+    if step == "password":
+        login = context.user_data["login_attempt"]
+        password = update.message.text.strip()
+
+        if login in ALLOWED_USERS and ALLOWED_USERS[login] == password:
+            context.user_data["authorized"] = True
+            context.user_data["login"] = login
+            user = get_user(chat_id)
+            user["login"] = login
+            await update.message.reply_text(f"✅ Добро пожаловать, {login}!")
+            get_user(chat_id)
+            save_data()
+            await update.message.reply_text(
+                "👋 Привет! Я бот для отслеживания твоих ставок.\n"
+                "Напиши /bet чтобы добавить ставку.\n"
+                "Напиши /info, чтобы узнать, что я умею."
+            )           
+        else:
+            await update.message.reply_text("❌ Неверный логин или пароль. Попробуй ещё раз.")
+            context.user_data.clear()
+            
+
 
 async def info(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(

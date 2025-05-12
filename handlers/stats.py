@@ -5,8 +5,10 @@ from telegram import Update
 from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
 from utils.storage import get_user
+from utils.auth import require_auth
 
 # /stats — общая статистика
+@require_auth
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = str(update.effective_chat.id)
     user = get_user(chat_id)
