@@ -85,3 +85,49 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         save_data()
         await query.edit_message_text(msg + f"\n💰 Новый банк {source}: {user['banks'][source]:.2f}€")
+        
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ContextTypes
+from utils.storage import get_user
+
+# /delete — показать кнопки для удаления активных ставок
+async def delete(update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = str(update.effective_chat.id)
+    user = get_user(chat_id)
+
+    keyboard = []
+    for i, b in enumerate(user["bets"]):
+        if b["status"] == "pending":
+            keyboard.append([InlineKeyboardButton(
+                f"{b['match']} ({b['amount']}€ @ {b['coeff']})", callback_data=f"del_{i}"
+            )])
+
+    if not keyboard:
+        await update.message.reply_text("❌ Нет активных ставок для удаления.")
+        return
+
+    await update.message.reply_text(
+        "🗑️ Выбери ставку для удаления:",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+# /undelete — восстановление удалённых ставок
+async def undelete(update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = str(update.effective_chat.id)
+    user = get_user(chat_id)
+
+    keyboard = []
+    for i, b in enumerate(user["bets"]):
+        if b["status"] == "deleted":
+            keyboard.append([InlineKeyboardButton(
+                f"{b['match']} ({b['amount']}€ @ {b['coeff']})", callback_data=f"undel_{i}"
+            )])
+
+    if not keyboard:
+        await update.message.reply_text("📦 Нет удалённых ставок для восстановления.")
+        return
+
+    await update.message.reply_text(
+        "♻️ Выбери ставку для восстановления:",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
