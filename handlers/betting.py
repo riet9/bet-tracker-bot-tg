@@ -115,8 +115,10 @@ async def bet_step_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reminder_time = None
         else:
             try:
-                dt = datetime.datetime.strptime(answer, "%d.%m %H:%M").replace(tzinfo=LATVIA_TZ)
-                if dt <= now:
+                naive_dt = datetime.datetime.strptime(answer, "%d.%m %H:%M")
+                dt = naive_dt.replace(tzinfo=LATVIA_TZ)
+
+                if dt.astimezone(datetime.timezone.utc) <= now.astimezone(datetime.timezone.utc):
                     await update.message.reply_text(
                         f"⚠️ Указанное время уже прошло. Напоминание не установлено.\n"
                         f"Сейчас: <b>{now.strftime('%d.%m %H:%M')}</b>\n"
@@ -160,5 +162,3 @@ async def bet_step_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 when=dt - now
             )
             await update.message.reply_text(f"🔔 Напоминание установлено на {dt.strftime('%d.%m %H:%M')}")
-
-# /delete и /undelete вынесем в buttons.py
