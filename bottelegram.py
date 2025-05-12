@@ -76,6 +76,22 @@ def get_user(chat_id: str):
             user.pop("bank", None)
     return users_data[chat_id]
 
+'''
+def get_user(chat_id: str):
+    chat_id = str(chat_id)
+    if chat_id not in users_data:
+        users_data[chat_id] = {
+            "banks": {
+                "optibet": 0.0,
+                "olybet": 0.0,
+                "bonus": 0.0
+            },
+            "bets": [],
+            "timezone": "Europe/Riga"  # по умолчанию
+        }
+    return users_data[chat_id]
+'''
+
 #endregion
 
 #region Команды интерфейса (/start, /info, /bank, /users_count)
@@ -407,50 +423,69 @@ async def process_today_lines(update: Update, context: ContextTypes.DEFAULT_TYPE
             continue
 
         explanation = ""
+        start_time = ""
+        end_time = ""
+        stake_line = ""
+
         if i + 1 < len(lines):
-            explanation = lines[i+1].strip()
-            if "@" not in explanation and explanation != "":
+            next_line = lines[i + 1].strip()
+            if next_line and "@" not in next_line:
+                explanation = next_line
                 i += 1
+
+        for _ in range(3):  # максимум 3 строки: время и сумма
+            if i + 1 >= len(lines):
+                break
+            next_line = lines[i + 1].strip().lower()
+            if next_line.startswith("начало:"):
+                start_time = lines[i + 1].strip()
+            elif next_line.startswith("окончание:") or next_line.startswith("оконч:"):
+                end_time = lines[i + 1].strip()
+            elif next_line.startswith("рекомендованная сумма:"):
+                stake_line = lines[i + 1].strip()
             else:
-                explanation = ""
+                break
+            i += 1
 
         try:
             coeff = float(line.split("@")[-1].strip())
         except:
             coeff = None
 
+        full_entry = f"{line}"
+        if explanation: full_entry += f"\n💬 {explanation}"
+        if start_time:  full_entry += f"\n⏰ {start_time}"
+        if end_time:    full_entry += f"\n⏳ {end_time}"
+        if stake_line:  full_entry += f"\n💵 {stake_line}"
+
         if coeff:
             if coeff <= 1.20 and len(safe) < 2:
-                safe.append((line, explanation))
+                safe.append(full_entry)
             elif 1.60 <= coeff <= 2.50 and len(value) < 5:
-                value.append((line, explanation))
+                value.append(full_entry)
 
         i += 1
 
     msg = "📅 <b>Ставки на сегодня:</b>\n\n"
     if safe:
         msg += "<b>#safe:</b>\n"
-        for idx, (line, expl) in enumerate(safe, 1):
-            msg += f"{idx}. {line}\n"
-            if expl:
-                msg += f"💬 {expl}\n"
-        msg += "\n"
+        for idx, entry in enumerate(safe, 1):
+            msg += f"{idx}. {entry}\n\n"
     if value:
         msg += "<b>#value:</b>\n"
-        for idx, (line, expl) in enumerate(value, 1):
-            msg += f"{idx}. {line}\n"
-            if expl:
-                msg += f"💬 {expl}\n"
-        msg += "\n"
+        for idx, entry in enumerate(value, 1):
+            msg += f"{idx}. {entry}\n\n"
 
     total = len(safe) + len(value)
-    msg += f"💰 Всего: {total} {'ставка' if total==1 else 'ставки' if total<5 else 'ставок'}"
+    msg += f"💰 Всего: {total} {'ставка' if total == 1 else 'ставки' if total < 5 else 'ставок'}"
 
     if not safe and not value:
-        await update.message.reply_text("⚠️ Ни одна ставка не распознана. Убедись, что используешь формат:\n\nNaVi vs G2 – победа G2 @1.85\nКомментарий")
+        await update.message.reply_text("⚠️ Ни одна ставка не распознана. Убедись, что используешь формат из промпта.")
         return
 
     await update.message.reply_text(msg, parse_mode=ParseMode.HTML)
+
+
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
