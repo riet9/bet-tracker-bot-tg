@@ -23,6 +23,7 @@ async def today(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Обработка строк прогноза из ChatGPT
 async def process_today_lines(update: Update, context: ContextTypes.DEFAULT_TYPE, lines: list[str]):
     safe, value = [], []
+    deadline_line = ""
     i = 0
     while i < len(lines):
         line = lines[i].strip()
@@ -41,7 +42,7 @@ async def process_today_lines(update: Update, context: ContextTypes.DEFAULT_TYPE
                 explanation = next_line
                 i += 1
 
-        for _ in range(3):
+        for _ in range(4):  # максимум 4 строки после прогноза
             if i + 1 >= len(lines):
                 break
             next_line = lines[i + 1].strip().lower()
@@ -49,11 +50,14 @@ async def process_today_lines(update: Update, context: ContextTypes.DEFAULT_TYPE
                 start_time = lines[i + 1].strip()
             elif next_line.startswith("окончание:") or next_line.startswith("оконч:"):
                 end_time = lines[i + 1].strip()
+            elif next_line.startswith("ставить до:") or next_line.startswith("до:"):
+                deadline_line = lines[i + 1].strip()
             elif next_line.startswith("рекомендованная сумма:"):
                 stake_line = lines[i + 1].strip()
             else:
                 break
             i += 1
+
 
         try:
             coeff = float(line.split("@")[-1].strip())
@@ -119,6 +123,7 @@ async def prompt_button_handler(update: Update, context: ContextTypes.DEFAULT_TY
         "Команда1 vs Команда2 – исход @коэффициент\n"
         "Краткое пояснение, почему ставка логична.\n"
         "Начало: [время по Риге], окончание: ~[время окончания]\n"
+        "⏳ Укажи также *до какого времени желательно сделать ставку*\n"
         "Рекомендованная сумма: €[сумма], [платформа]\n\n"
         "❗️Не добавляй вводный или завершающий текст. Только чистый список в этом формате."
     )
