@@ -1,7 +1,9 @@
 from telegram import Update
+from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 from collections import Counter
 from utils.storage import get_user
+from utils.auth import require_auth
 
 # /top_teams — показать топ команд по ставкам
 async def top_teams(update: Update, context: ContextTypes.DEFAULT_TYPE):
