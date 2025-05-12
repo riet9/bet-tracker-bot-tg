@@ -13,7 +13,7 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = str(update.effective_chat.id)
     user = get_user(chat_id)
     banks = user["banks"]
-    completed = [b for b in user["bets"] if b["status"] != "pending"]
+    completed = [b for b in user["bets"] if b["status"] in ("win", "lose")]
     wins = [b for b in completed if b["status"] == "win"]
     losses = [b for b in completed if b["status"] == "lose"]
 
@@ -66,7 +66,7 @@ async def summary(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Используй:\n/summary, /summary 7d, /summary 30d")
         return
 
-    completed = [b for b in filtered if b["status"] != "pending"]
+    completed = [b for b in filtered if b["status"] in ("win", "lose")]
     wins = [b for b in completed if b["status"] == "win"]
     losses = [b for b in completed if b["status"] == "lose"]
     profit = sum((b["amount"] * b["coeff"] - b["amount"]) if b["status"] == "win" else -b["amount"] for b in completed)
@@ -100,7 +100,7 @@ async def history(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Неверный тип. Доступны: #safe, #value, #normal")
         return
 
-    filtered = [b for b in user["bets"] if b.get("type") == bet_type and b["status"] != "pending"]
+    filtered = [b for b in user["bets"] if b.get("type") == bet_type and b["status"] in ("win", "lose")]
     if not filtered:
         await update.message.reply_text(f"📭 Нет завершённых #{bet_type} ставок.")
         return
@@ -140,7 +140,7 @@ async def export(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def graph(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = str(update.effective_chat.id)
     user = get_user(chat_id)
-    completed = [b for b in user["bets"] if b["status"] != "pending"]
+    completed = [b for b in user["bets"] if b["status"] in ("win", "lose")]
     if not completed:
         await update.message.reply_text("Нет завершённых ставок.")
         return
@@ -168,7 +168,7 @@ async def graph(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def show_type_stats(update: Update, context: ContextTypes.DEFAULT_TYPE, bet_type: str):
     user = get_user(str(update.effective_chat.id))
-    bets = [b for b in user["bets"] if b.get("type") == bet_type and b["status"] != "pending"]
+    bets = [b for b in user["bets"] if b.get("type") == bet_type and b["status"] in ("win", "lose")]
     if not bets:
         await update.message.reply_text(f"📭 Нет завершённых #{bet_type} ставок.")
         return
@@ -201,7 +201,7 @@ async def top_type(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = get_user(str(update.effective_chat.id))
 
     def stats_for(type_):
-        b = [x for x in user["bets"] if x.get("type") == type_ and x["status"] != "pending"]
+        b = [x for x in user["bets"] if x.get("type") == type_ and x["status"] in ("win", "lose")]
         if not b: return None
         wins = [x for x in b if x["status"] == "win"]
         roi = sum((x["amount"] * x["coeff"] - x["amount"]) if x["status"] == "win" else -x["amount"] for x in b)
