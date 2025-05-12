@@ -154,3 +154,77 @@ async def graph(update: Update, context: ContextTypes.DEFAULT_TYPE):
     plt.close()
 
     await update.message.reply_photo(photo=open("graph.png", "rb"))
+
+# Статистика по типу: /safe_stats и /value_stats
+
+async def show_type_stats(update: Update, context: ContextTypes.DEFAULT_TYPE, bet_type: str):
+    user = get_user(str(update.effective_chat.id))
+    bets = [b for b in user["bets"] if b.get("type") == bet_type and b["status"] != "pending"]
+    if not bets:
+        await update.message.reply_text(f"📭 Нет завершённых #{bet_type} ставок.")
+        return
+
+    wins = [b for b in bets if b["status"] == "win"]
+    losses = [b for b in bets if b["status"] == "lose"]
+    total = len(bets)
+    roi = sum((b["amount"] * b["coeff"] - b["amount"]) if b["status"] == "win" else -b["amount"] for b in bets)
+    avg_coeff = sum(b["coeff"] for b in bets) / total
+    winrate = len(wins) / total * 100
+
+    await update.message.reply_text(
+        f"📊 <b>#{bet_type}</b> ставки:\n"
+        f"🎯 Завершено: {total}\n"
+        f"✅ Побед: {len(wins)} | ❌ Поражений: {len(losses)}\n"
+        f"📈 Winrate: {winrate:.1f}%\n"
+        f"📉 Средний кэф: {avg_coeff:.2f}\n"
+        f"📥 ROI: {roi:.2f}€",
+        parse_mode=ParseMode.HTML
+    )
+
+async def safe_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await show_type_stats(update, context, "safe")
+
+async def value_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await show_type_stats(update, context, "value")
+
+# /top_type — сравнение стратегий
+async def top_type(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = get_user(str(update.effective_chat.id))
+
+    def stats_for(type_):
+        b = [x for x in user["bets"] if x.get("type") == type_ and x["status"] != "pending"]
+        if not b: return None
+        wins = [x for x in b if x["status"] == "win"]
+        roi = sum((x["amount"] * x["coeff"] - x["amount"]) if x["status"] == "win" else -x["amount"] for x in b)
+        return {
+            "count": len(b),
+            "wins": len(wins),
+            "winrate": len(wins) / len(b) * 100,
+            "avg_coeff": sum(x["coeff"] for x in b) / len(b),
+            "roi": roi
+        }
+
+    s1 = stats_for("safe")
+    s2 = stats_for("value")
+
+    if not s1 and not s2:
+        await update.message.reply_text("⚠️ Нет завершённых #safe или #value ставок.")
+        return
+
+    def fmt(name, d):
+        return (
+            f"<b>#{name}</b>\n"
+            f"🎯 Завершено: {d['count']}, ✅ Побед: {d['wins']}\n"
+            f"📈 Winrate: {d['winrate']:.1f}%\n"
+            f"📉 Средний кэф: {d['avg_coeff']:.2f}\n"
+            f"📥 ROI: {d['roi']:.2f}€\n\n"
+        )
+
+    msg = "<b>📊 Сравнение стратегий:</b>\n\n"
+    if s1: msg += fmt("safe", s1)
+    if s2: msg += fmt("value", s2)
+    if s1 and s2:
+        better = "#safe" if s1["roi"] > s2["roi"] else "#value"
+        msg += f"🏆 <b>{better}</b> сейчас прибыльнее!"
+
+    await update.message.reply_text(msg, parse_mode=ParseMode.HTML)
