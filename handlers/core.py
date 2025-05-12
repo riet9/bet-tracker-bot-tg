@@ -9,6 +9,7 @@ import subprocess
 
 # Замените на свой Telegram ID
 ADMIN_ID = 2047828228  # ← поставь сюда свой chat_id
+DATA_FILE = "/mnt/data/users_data.json"
 
 """
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -105,7 +106,7 @@ async def admin_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         await update.message.reply_document(
-            document=open("/mnt/data/users_data.json", "rb"),
+            document=open(DATA_FILE, "rb"),
             filename="users_data.json",
             caption="📄 Текущий сейв-файл"
         )

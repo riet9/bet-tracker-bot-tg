@@ -2,7 +2,7 @@ import json
 import os
 from zoneinfo import ZoneInfo
 
-# Файл Railway
+# 📁 Файл Railway
 DATA_FILE = "/mnt/data/users_data.json"
 LATVIA_TZ = ZoneInfo("Europe/Riga")
 users_data = {}
@@ -51,3 +51,7 @@ def get_user(chat_id: str):
             }
             user.pop("bank", None)
     return users_data[chat_id]
+
+# 🔁 Создание файла, если его не было
+if not os.path.exists(DATA_FILE):
+    save_data()
