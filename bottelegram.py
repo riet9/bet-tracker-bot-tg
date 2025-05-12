@@ -13,12 +13,11 @@ from telegram.ext import (
     MessageHandler, CallbackQueryHandler, filters
 )
 from dotenv import load_dotenv
-from datetime import datetime
 from zoneinfo import ZoneInfo
 
 load_dotenv()
 TOKEN = os.getenv("BOT_TOKEN")
-LATVIA_TZ = ZoneInfo.timezone("Europe/Riga")
+LATVIA_TZ = ZoneInfo("Europe/Riga")
 
 # Настройка логов
 logging.basicConfig(
@@ -205,8 +204,8 @@ async def bet_step_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         try:
-            now = datetime.now(LATVIA_TZ)
-            dt = LATVIA_TZ.localize(datetime.strptime(answer, "%d.%m %H:%M"))
+            now = datetime.datetime.now(LATVIA_TZ)
+            dt = datetime.datetime.strptime(answer, "%d.%m %H:%M").replace(tzinfo=LATVIA_TZ)
 
             if dt < now:
                 await update.message.reply_text("⚠️ Указанное время уже прошло. Напоминание не установлено.")
