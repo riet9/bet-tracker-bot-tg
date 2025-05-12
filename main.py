@@ -12,6 +12,8 @@ from handlers.stats import stats, summary, safe_stats, value_stats, top_type, hi
 from handlers.buttons import button_handler, delete, undelete
 from utils.storage import load_data
 from handlers.reminders import morning_reminder
+from handlers.goal import goal
+
 
 load_dotenv()
 TOKEN = os.getenv("BOT_TOKEN")
@@ -44,6 +46,7 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler("graph", graph))
     app.add_handler(CommandHandler("export", export))
     app.add_handler(CommandHandler("prompt", prompt))
+    app.add_handler(CommandHandler("goal", goal))
 
     app.add_handler(CallbackQueryHandler(prompt_button_handler, pattern="^send_prompt$"))
     app.add_handler(CallbackQueryHandler(button_handler))
