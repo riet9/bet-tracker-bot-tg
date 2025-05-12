@@ -116,7 +116,8 @@ async def bet_step_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             try:
                 dt = datetime.datetime.strptime(answer, "%d.%m %H:%M").replace(tzinfo=LATVIA_TZ)
-                if dt < now:
+                now_rounded = now.replace(second=0, microsecond=0)
+                if dt <= now_rounded:
                     await update.message.reply_text(
                         f"⚠️ Указанное время уже прошло. Напоминание не установлено.\n"
                         f"Сейчас: <b>{now.strftime('%d.%m %H:%M')}</b>\n"
