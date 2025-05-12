@@ -9,7 +9,7 @@ from handlers.core import start, info, bank_command, users_count
 from handlers.betting import bet, cancel, pending,  bet_step_handler
 from handlers.today import today, prompt, prompt_button_handler
 from handlers.stats import stats, summary, safe_stats, value_stats, top_type, history, graph, export
-from handlers.buttons import button_handler, delete, undelete
+from handlers.buttons import button_handler, delete, undelete, result
 from utils.storage import load_data
 from handlers.reminders import morning_reminder
 from handlers.goal import goal
@@ -40,7 +40,7 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler("pending", pending))
     app.add_handler(CommandHandler("history", history))
     app.add_handler(CommandHandler("summary", summary))
-    app.add_handler(CommandHandler("result", button_handler))
+    app.add_handler(CommandHandler("result", result))
     app.add_handler(CommandHandler("stats", stats))
     app.add_handler(CommandHandler("safe_stats", safe_stats))
     app.add_handler(CommandHandler("value_stats", value_stats))

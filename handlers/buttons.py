@@ -90,6 +90,28 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from utils.storage import get_user
 
+# /result — выбор ставки для указания результата
+async def result(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = str(update.effective_chat.id)
+    user = get_user(chat_id)
+
+    keyboard = []
+    for i, b in enumerate(user["bets"]):
+        if b["status"] == "pending":
+            keyboard.append([InlineKeyboardButton(
+                f"{b['match']} ({b['amount']}€ @ {b['coeff']})", callback_data=f"res_{i}"
+            )])
+
+    if not keyboard:
+        await update.message.reply_text("ℹ️ Нет активных ставок для завершения.")
+        return
+
+    await update.message.reply_text(
+        "📊 Выбери ставку, чтобы указать её результат:",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
 # /delete — показать кнопки для удаления активных ставок
 async def delete(update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = str(update.effective_chat.id)
