@@ -60,8 +60,6 @@ def get_user(chat_id: str):
 #region Команды интерфейса (/start, /info, /bank, /users_count)
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = str(update.effective_chat.id)
-    print(f"Твой chat_id: {chat_id}")
-    await update.message.reply_text(f"Привет! Твой chat_id: {chat_id}")
     get_user(chat_id)
     save_data()
     await update.message.reply_text(
@@ -136,6 +134,18 @@ async def bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Введи название матча (пример: NaVi vs G2)")
 
 async def bet_step_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    
+    # ⬇️ Обработка отложенного прогноза после /today
+    if context.user_data.get("awaiting_today_input"):
+        context.user_data.pop("awaiting_today_input")
+        lines = update.message.text.splitlines()
+        if len(lines) < 2:
+            await update.message.reply_text("⚠️ Нужно минимум 2 строки: ставка и пояснение.")
+            return
+        await process_today_lines(update, context, lines)
+        return
+
+    
     chat_id = str(update.effective_chat.id)
     user = get_user(chat_id)
     step = context.user_data.get("bet_step")
@@ -278,13 +288,89 @@ async def undelete(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 #region Работа с прогнозом дня
 
+# async def today(update: Update, context: ContextTypes.DEFAULT_TYPE):
+#     text = update.message.text
+#     lines = text.splitlines()[1:]  # убираем "/today"
+#     if len(lines) < 2:
+#         await update.message.reply_text("⚠️ Вставь прогноз в формате:\n\nМатч – исход @кэф\nПояснение")
+#         return
+
+#     safe, value = [], []
+#     i = 0
+#     while i < len(lines):
+#         line = lines[i].strip()
+#         if "@" not in line:
+#             i += 1
+#             continue
+
+#         # Следующая строка — пояснение
+#         explanation = ""
+#         if i + 1 < len(lines):
+#             explanation = lines[i+1].strip()
+#             if "@" in explanation or explanation == "":
+#                 explanation = ""
+#             else:
+#                 i += 1  # пропускаем пояснение как уже обработанное
+
+#         # Парсим коэффициент
+#         try:
+#             coeff = float(line.split("@")[-1].strip())
+#         except:
+#             coeff = None
+
+#         # Категория
+#         if coeff:
+#             if coeff <= 1.20 and len(safe) < 2:
+#                 safe.append((line, explanation))
+#             elif 1.60 <= coeff <= 2.50 and len(value) < 5:
+#                 value.append((line, explanation))
+
+#         i += 1
+
+#     # Формируем сообщение
+#     msg = "📅 <b>Ставки на сегодня:</b>\n\n"
+
+#     if safe:
+#         msg += "<b>#safe:</b>\n"
+#         for idx, (line, expl) in enumerate(safe, 1):
+#             msg += f"{idx}. {line}\n"
+#             if expl:
+#                 msg += f"💬 {expl}\n"
+#         msg += "\n"
+
+#     if value:
+#         msg += "<b>#value:</b>\n"
+#         for idx, (line, expl) in enumerate(value, 1):
+#             msg += f"{idx}. {line}\n"
+#             if expl:
+#                 msg += f"💬 {expl}\n"
+#         msg += "\n"
+
+#     total = len(safe) + len(value)
+#     msg += f"💰 Всего: {total} {'ставка' if total==1 else 'ставки' if total<5 else 'ставок'}"
+
+#     await update.message.reply_text(msg, parse_mode=ParseMode.HTML)
 async def today(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
-    lines = text.splitlines()[1:]  # убираем "/today"
+    lines = text.splitlines()
+
+    # Если только /today без прогноза
+    if len(lines) == 1:
+        context.user_data["awaiting_today_input"] = True
+        await update.message.reply_text("📥 Вставь прогноз (список ставок), начиная со следующего сообщения.")
+        return
+
+    # Если прогноз сразу в том же сообщении
+    lines = lines[1:]  # убираем /today
+
     if len(lines) < 2:
         await update.message.reply_text("⚠️ Вставь прогноз в формате:\n\nМатч – исход @кэф\nПояснение")
         return
 
+    await process_today_lines(update, context, lines)
+
+
+async def process_today_lines(update: Update, context: ContextTypes.DEFAULT_TYPE, lines: list[str]):
     safe, value = [], []
     i = 0
     while i < len(lines):
@@ -293,22 +379,19 @@ async def today(update: Update, context: ContextTypes.DEFAULT_TYPE):
             i += 1
             continue
 
-        # Следующая строка — пояснение
         explanation = ""
         if i + 1 < len(lines):
             explanation = lines[i+1].strip()
-            if "@" in explanation or explanation == "":
-                explanation = ""
+            if "@" not in explanation and explanation != "":
+                i += 1
             else:
-                i += 1  # пропускаем пояснение как уже обработанное
+                explanation = ""
 
-        # Парсим коэффициент
         try:
             coeff = float(line.split("@")[-1].strip())
         except:
             coeff = None
 
-        # Категория
         if coeff:
             if coeff <= 1.20 and len(safe) < 2:
                 safe.append((line, explanation))
@@ -317,9 +400,7 @@ async def today(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         i += 1
 
-    # Формируем сообщение
     msg = "📅 <b>Ставки на сегодня:</b>\n\n"
-
     if safe:
         msg += "<b>#safe:</b>\n"
         for idx, (line, expl) in enumerate(safe, 1):
@@ -327,7 +408,6 @@ async def today(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if expl:
                 msg += f"💬 {expl}\n"
         msg += "\n"
-
     if value:
         msg += "<b>#value:</b>\n"
         for idx, (line, expl) in enumerate(value, 1):
@@ -340,6 +420,7 @@ async def today(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg += f"💰 Всего: {total} {'ставка' if total==1 else 'ставки' if total<5 else 'ставок'}"
 
     await update.message.reply_text(msg, parse_mode=ParseMode.HTML)
+
 
 
 #endregion
@@ -441,22 +522,22 @@ async def remind_result(context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(chat_id=chat_id,
         text=f"🔔 Напоминание: не забудь ввести результат ставки: {match}\nНапиши /result")
     
-# async def morning_reminder(context: ContextTypes.DEFAULT_TYPE):
-#     chat_id = "твой_chat_id_здесь"  # Вставь сюда свой Telegram chat_id как строку, например: "123456789"
-#     await context.bot.send_message(
-#         chat_id=chat_id,
-#         text=(
-#             "🌅 Доброе утро! Готовим прогноз 🎯\n\n"
-#             "Скопируй это в ChatGPT:\n\n"
-#             "Найди 0–2 максимально надёжные #safe ставки (1.10–1.20) и 0–5 логичных value-ставок (1.60–2.50) "
-#             "на сегодня по CS2, футболу и хоккею. Если есть действительно ценные ставки в других дисциплинах — тоже включи.\n\n"
-#             "Формат каждой ставки:\n"
-#             "Матч – исход @коэффициент\n"
-#             "Пояснение (1–2 строки)\n\n"
-#             "❗️Без лишнего текста. Только список."
-#         ),
-#         parse_mode="HTML"
-#     )
+async def morning_reminder(context: ContextTypes.DEFAULT_TYPE):
+    chat_id = "2047828228"  # Вставь сюда свой Telegram chat_id как строку, например: "123456789"
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=(
+            "🌅 Доброе утро! Готовим прогноз 🎯\n\n"
+            "Скопируй это в ChatGPT:\n\n"
+            "Найди 0–2 максимально надёжные #safe ставки (1.10–1.20) и 0–5 логичных value-ставок (1.60–2.50) "
+            "на сегодня по CS2, футболу и хоккею. Если есть действительно ценные ставки в других дисциплинах — тоже включи.\n\n"
+            "Формат каждой ставки:\n"
+            "Матч – исход @коэффициент\n"
+            "Пояснение (1–2 строки)\n\n"
+            "❗️Без лишнего текста. Только список."
+        ),
+        parse_mode="HTML"
+    )
 
 
 #endregion
@@ -681,10 +762,10 @@ if __name__ == '__main__':
     load_data()
     app = ApplicationBuilder().token(TOKEN).build()
 
-    # app.job_queue.run_daily(
-    #     morning_reminder,
-    #     time=datetime.time(hour=9, minute=0),  # ежедневное напоминание в 9:00
-    # )
+    app.job_queue.run_daily(
+        morning_reminder,
+        time=datetime.time(hour=9, minute=0),  # ежедневное напоминание в 9:00
+    )
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("info", info))
