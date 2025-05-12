@@ -13,6 +13,8 @@ from handlers.buttons import button_handler, delete, undelete
 from utils.storage import load_data
 from handlers.reminders import morning_reminder
 from handlers.goal import goal
+from handlers.analysis import top_teams, review
+
 
 
 load_dotenv()
@@ -47,6 +49,8 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler("export", export))
     app.add_handler(CommandHandler("prompt", prompt))
     app.add_handler(CommandHandler("goal", goal))
+    app.add_handler(CommandHandler("top_teams", top_teams))
+    app.add_handler(CommandHandler("review", review))
 
     app.add_handler(CallbackQueryHandler(prompt_button_handler, pattern="^send_prompt$"))
     app.add_handler(CallbackQueryHandler(button_handler))
