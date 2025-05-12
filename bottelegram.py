@@ -572,6 +572,7 @@ async def morning_reminder(context: ContextTypes.DEFAULT_TYPE):
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = str(update.effective_chat.id)
     user = get_user(chat_id)
+    banks = user["banks"]
     completed = [b for b in user["bets"] if b["status"] != "pending"]
     wins = [b for b in completed if b["status"] == "win"]
     losses = [b for b in completed if b["status"] == "lose"]
@@ -582,9 +583,13 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     winrate = len(wins) / total * 100 if total else 0
     total_bets = sum(b["amount"] for b in completed)
 
+    total_bank = sum(banks.values())
     await update.message.reply_text(
         f"📊 Статистика:\n"
-        f"💰 Банк: {user['bank']:.2f}€\n"
+        f"🏦 Optibet: {banks['optibet']:.2f}€\n"
+        f"🏦 Olybet: {banks['olybet']:.2f}€\n"
+        f"🎁 Бонусы: {banks['bonus']:.2f}€\n"
+        f"📊 Всего банк: {total_bank:.2f}€\n\n"
         f"🎯 Ставок завершено: {total}\n"
         f"✅ Побед: {len(wins)} | ❌ Поражений: {len(losses)}\n"
         f"📈 Winrate: {winrate:.1f}%\n"
@@ -592,10 +597,12 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"💸 Сумма ставок: {total_bets:.2f}€\n"
         f"📥 ROI: {roi:.2f}€"
     )
+
     
 async def summary(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = str(update.effective_chat.id)
     user = get_user(chat_id)
+    banks = user["banks"]
 
     now = datetime.datetime.now()
     period = context.args[0] if context.args else "today"
@@ -620,14 +627,19 @@ async def summary(update: Update, context: ContextTypes.DEFAULT_TYPE):
     losses = [b for b in completed if b["status"] == "lose"]
     profit = sum((b["amount"] * b["coeff"] - b["amount"]) if b["status"] == "win" else -b["amount"] for b in completed)
 
+    total_bank = sum(banks.values())
     await update.message.reply_text(
         f"📆 <b>{label}:</b>\n"
         f"📋 Ставок: {len(filtered)} (завершено: {len(completed)})\n"
         f"✅ Победы: {len(wins)} | ❌ Поражения: {len(losses)}\n"
-        f"💸 Прибыль: {profit:.2f}€\n"
-        f"💰 Банк: {user['bank']:.2f}€",
+        f"💸 Прибыль: {profit:.2f}€\n\n"
+        f"🏦 Optibet: {banks['optibet']:.2f}€\n"
+        f"🏦 Olybet: {banks['olybet']:.2f}€\n"
+        f"🎁 Бонусы: {banks['bonus']:.2f}€\n"
+        f"📊 Всего банк: {total_bank:.2f}€",
         parse_mode="HTML"
     )
+
     
 async def show_type_stats(update: Update, context: ContextTypes.DEFAULT_TYPE, bet_type: str):
     chat_id = str(update.effective_chat.id)
