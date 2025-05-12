@@ -1,7 +1,9 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
+from datetime import datetime
 from utils.storage import get_user
+from utils.timezone import LATVIA_TZ
 
 # /today — вставка прогнозов в формате ChatGPT
 async def today(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -58,7 +60,6 @@ async def process_today_lines(update: Update, context: ContextTypes.DEFAULT_TYPE
                 break
             i += 1
 
-
         try:
             coeff = float(line.split("@")[-1].strip())
         except:
@@ -68,6 +69,7 @@ async def process_today_lines(update: Update, context: ContextTypes.DEFAULT_TYPE
         if explanation: full_entry += f"\n💬 {explanation}"
         if start_time:  full_entry += f"\n⏰ {start_time}"
         if end_time:    full_entry += f"\n⏳ {end_time}"
+        if deadline_line: full_entry += f"\n🕓 {deadline_line}"
         if stake_line:  full_entry += f"\n💵 {stake_line}"
 
         if coeff:
@@ -113,8 +115,10 @@ async def prompt_button_handler(update: Update, context: ContextTypes.DEFAULT_TY
     user = get_user(chat_id)
     banks = user["banks"]
 
+    today_str = datetime.now(LATVIA_TZ).strftime("%d.%m.%Y")
+
     prompt_text = (
-        "Найди 0–2 максимально надёжные #safe ставки и 0–5 логичных #value ставок на сегодня по CS2, футболу и хоккею.\n"
+        f"Найди 0–2 максимально надёжные #safe ставки и 0–5 логичных #value ставок на {today_str} по CS2, футболу и хоккею.\n"
         "Если есть действительно ценные ставки в других дисциплинах — тоже включи.\n\n"
         "Учитывай мой текущий банк:\n"
         f"- 🏦 Optibet: €{banks['optibet']:.2f}\n"
