@@ -53,6 +53,7 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler("top_teams", top_teams))
     app.add_handler(CommandHandler("review", review))
     app.add_handler(CommandHandler("mybets", mybets))
+    app.add_handler(CommandHandler("users_count", users_count))
 
     app.add_handler(CommandHandler("admin_download", admin_download))
 
