@@ -5,6 +5,7 @@ import datetime
 import csv
 import json
 import matplotlib.pyplot as plt
+from telegram.constants import ParseMode
 
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import (
@@ -59,6 +60,8 @@ def get_user(chat_id: str):
 #region Команды интерфейса (/start, /info, /bank, /users_count)
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = str(update.effective_chat.id)
+    print(f"Твой chat_id: {chat_id}")
+    await update.message.reply_text(f"Привет! Твой chat_id: {chat_id}")
     get_user(chat_id)
     save_data()
     await update.message.reply_text(
@@ -273,6 +276,74 @@ async def undelete(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 #endregion
 
+#region Работа с прогнозом дня
+
+async def today(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text
+    lines = text.splitlines()[1:]  # убираем "/today"
+    if len(lines) < 2:
+        await update.message.reply_text("⚠️ Вставь прогноз в формате:\n\nМатч – исход @кэф\nПояснение")
+        return
+
+    safe, value = [], []
+    i = 0
+    while i < len(lines):
+        line = lines[i].strip()
+        if "@" not in line:
+            i += 1
+            continue
+
+        # Следующая строка — пояснение
+        explanation = ""
+        if i + 1 < len(lines):
+            explanation = lines[i+1].strip()
+            if "@" in explanation or explanation == "":
+                explanation = ""
+            else:
+                i += 1  # пропускаем пояснение как уже обработанное
+
+        # Парсим коэффициент
+        try:
+            coeff = float(line.split("@")[-1].strip())
+        except:
+            coeff = None
+
+        # Категория
+        if coeff:
+            if coeff <= 1.20 and len(safe) < 2:
+                safe.append((line, explanation))
+            elif 1.60 <= coeff <= 2.50 and len(value) < 5:
+                value.append((line, explanation))
+
+        i += 1
+
+    # Формируем сообщение
+    msg = "📅 <b>Ставки на сегодня:</b>\n\n"
+
+    if safe:
+        msg += "<b>#safe:</b>\n"
+        for idx, (line, expl) in enumerate(safe, 1):
+            msg += f"{idx}. {line}\n"
+            if expl:
+                msg += f"💬 {expl}\n"
+        msg += "\n"
+
+    if value:
+        msg += "<b>#value:</b>\n"
+        for idx, (line, expl) in enumerate(value, 1):
+            msg += f"{idx}. {line}\n"
+            if expl:
+                msg += f"💬 {expl}\n"
+        msg += "\n"
+
+    total = len(safe) + len(value)
+    msg += f"💰 Всего: {total} {'ставка' if total==1 else 'ставки' if total<5 else 'ставок'}"
+
+    await update.message.reply_text(msg, parse_mode=ParseMode.HTML)
+
+
+#endregion
+
 #region Завершение и напоминания (/result, кнопки)
 
 async def result(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -369,6 +440,24 @@ async def remind_result(context: ContextTypes.DEFAULT_TYPE):
     match = data["match"]
     await context.bot.send_message(chat_id=chat_id,
         text=f"🔔 Напоминание: не забудь ввести результат ставки: {match}\nНапиши /result")
+    
+# async def morning_reminder(context: ContextTypes.DEFAULT_TYPE):
+#     chat_id = "твой_chat_id_здесь"  # Вставь сюда свой Telegram chat_id как строку, например: "123456789"
+#     await context.bot.send_message(
+#         chat_id=chat_id,
+#         text=(
+#             "🌅 Доброе утро! Готовим прогноз 🎯\n\n"
+#             "Скопируй это в ChatGPT:\n\n"
+#             "Найди 0–2 максимально надёжные #safe ставки (1.10–1.20) и 0–5 логичных value-ставок (1.60–2.50) "
+#             "на сегодня по CS2, футболу и хоккею. Если есть действительно ценные ставки в других дисциплинах — тоже включи.\n\n"
+#             "Формат каждой ставки:\n"
+#             "Матч – исход @коэффициент\n"
+#             "Пояснение (1–2 строки)\n\n"
+#             "❗️Без лишнего текста. Только список."
+#         ),
+#         parse_mode="HTML"
+#     )
+
 
 #endregion
 
@@ -592,6 +681,11 @@ if __name__ == '__main__':
     load_data()
     app = ApplicationBuilder().token(TOKEN).build()
 
+    # app.job_queue.run_daily(
+    #     morning_reminder,
+    #     time=datetime.time(hour=9, minute=0),  # ежедневное напоминание в 9:00
+    # )
+
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("info", info))
     app.add_handler(CommandHandler("bank", bank_command))
@@ -614,6 +708,7 @@ if __name__ == '__main__':
 
     app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, bet_step_handler))
+
 
     app.run_polling()
 #endregion
