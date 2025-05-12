@@ -98,38 +98,20 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ Неверный логин или пароль. Попробуй снова.")
             context.user_data.clear()
 
-
-
-async def admin_backup_push(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def admin_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
-        await update.message.reply_text("⛔️ У тебя нет доступа.")
+        await update.message.reply_text("⛔️ Нет доступа.")
         return
 
     try:
-        subprocess.run(["git", "add", "backups/users_data.json"], check=True)
-        subprocess.run(["git", "commit", "-m", "Auto backup"], check=True)
-        subprocess.run(["git", "push"], check=True)
-        await update.message.reply_text("✅ Бэкап запушен в GitHub.")
+        await update.message.reply_document(
+            document=open("/mnt/data/users_data.json", "rb"),
+            filename="users_data.json",
+            caption="📄 Текущий сейв-файл"
+        )
     except Exception as e:
-        await update.message.reply_text(f"⚠️ Ошибка при push: {e}")
+        await update.message.reply_text(f"⚠️ Не удалось отправить файл: {e}")
 
-"""
-# /admin_backup — экспорт users_data.json вручную
-async def admin_backup(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
-        await update.message.reply_text("⛔️ У тебя нет доступа к этой команде.")
-        return
-
-    filename = "users_data_backup.json"
-    with open(filename, "w", encoding="utf-8") as f:
-        json.dump(users_data, f, indent=2, ensure_ascii=False, default=str)
-
-    await update.message.reply_document(
-        document=open(filename, "rb"),
-        filename=filename,
-        caption="📄 Резервная копия users_data"
-    )
-"""
 
 async def info(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(

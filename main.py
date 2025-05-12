@@ -5,7 +5,8 @@ import datetime  # ← вот эта строка
 
 
 # Импортируем хендлеры из модулей (после их создания)
-from handlers.core import start, info, bank_command, users_count, admin_backup_push
+from handlers.core import start, info, bank_command, users_count, admin_backup_push, admin_download
+
 from handlers.betting import bet, cancel, pending,  bet_step_handler
 from handlers.today import today, prompt, prompt_button_handler
 from handlers.stats import stats, summary, safe_stats, value_stats, top_type, history, graph, export
@@ -53,6 +54,8 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler("top_teams", top_teams))
     app.add_handler(CommandHandler("review", review))
     
+    app.add_handler(CommandHandler("admin_download", admin_download))
+
     app.add_handler(CommandHandler("admin_backup_push", admin_backup_push))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, auth_handler))
     # app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, bet_step_handler))
