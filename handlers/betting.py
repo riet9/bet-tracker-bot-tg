@@ -6,12 +6,12 @@ from utils.auth import require_auth
 
 @require_auth
 async def bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    authorized = context.user_data.get("authorized")
+    # Сохраняем авторизацию и логин, очищаем шаги ставки
+    auth = context.user_data.get("authorized")
     login = context.user_data.get("login")
     context.user_data.clear()
-    context.user_data["authorized"] = authorized
+    context.user_data["authorized"] = auth
     context.user_data["login"] = login
-
     context.user_data["bet_step"] = "sport"
 
     keyboard = [
@@ -31,6 +31,7 @@ async def bet_step_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if query:
         await query.answer()
         data = query.data
+        chat_id = str(query.message.chat.id)
 
         if data.startswith("sport_"):
             sport = data.split("_")[1]
@@ -40,8 +41,7 @@ async def bet_step_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 return
             context.user_data["sport"] = sport
             context.user_data["bet_step"] = "match"
-            await query.message.reply_text(f"✅ Вид спорта: {sport}")
-            await query.message.reply_text("Введи матч (например: NaVi vs G2)")
+            await query.message.reply_text(f"✅ Вид спорта: {sport}\nВведи матч (например: NaVi vs G2)")
             return
 
         if data.startswith("type_"):
@@ -51,20 +51,20 @@ async def bet_step_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await query.message.reply_text(f"✅ Тип ставки: #{t}")
             else:
                 await query.message.reply_text("Тип ставки будет определён автоматически.")
-            context.user_data["bet_step"] = "platform"
-            keyboard = [
-                [InlineKeyboardButton("Optibet", callback_data="platform_optibet")],
-                [InlineKeyboardButton("Olybet", callback_data="platform_olybet")],
-                [InlineKeyboardButton("Bonus", callback_data="platform_bonus")],
-            ]
-            await query.message.reply_text("Выбери платформу:", reply_markup=InlineKeyboardMarkup(keyboard))
+            context.user_data["bet_step"] = "reminder"
+            await query.message.reply_text("🔔 Хочешь установить напоминание? Введи ДД.ММ ЧЧ:ММ или 'нет'")
             return
 
         if data.startswith("platform_"):
             platform = data.split("_")[1]
             context.user_data["platform"] = platform
-            context.user_data["bet_step"] = "reminder"
-            await query.message.reply_text("🔔 Хочешь установить напоминание о проверке этой ставки?\nВведи дату и время в формате: ДД.ММ ЧЧ:ММ\nИли напиши 'нет'")
+            context.user_data["bet_step"] = "amount"
+            current_balance = get_user(chat_id)["banks"].get(platform, 0)
+            if current_balance == 0:
+                context.user_data.clear()
+                await query.message.reply_text(f"❌ У тебя 0€ на платформе {platform}. Ставка отменена.")
+                return
+            await query.message.reply_text("💰 Введи сумму ставки в €:")
             return
 
     # === TEXT INPUT ===
@@ -76,24 +76,43 @@ async def bet_step_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if step == "sport_manual":
         context.user_data["sport"] = message
         context.user_data["bet_step"] = "match"
-        await update.message.reply_text(f"✅ Вид спорта: {message}")
-        await update.message.reply_text("Введи матч (например: NaVi vs G2)")
+        await update.message.reply_text(f"✅ Вид спорта: {message}\nВведи матч (например: NaVi vs G2)")
         return
 
     if step == "match":
         context.user_data["match"] = message
-        context.user_data["bet_step"] = "amount"
-        await update.message.reply_text("💰 Введи сумму ставки в €:")
+        context.user_data["bet_step"] = "platform"
+        keyboard = [
+            [InlineKeyboardButton("Optibet", callback_data="platform_optibet")],
+            [InlineKeyboardButton("Olybet", callback_data="platform_olybet")],
+            [InlineKeyboardButton("Bonus", callback_data="platform_bonus")],
+        ]
+        await update.message.reply_text("Выбери платформу:", reply_markup=InlineKeyboardMarkup(keyboard))
         return
 
     if step == "amount":
         try:
             amount = float(message)
+            platform = context.user_data.get("platform")
+            current_balance = user["banks"].get(platform, 0)
+
             if amount <= 0:
-                raise ValueError
+                await update.message.reply_text("⚠️ Сумма должна быть больше 0.")
+                return
+
+            if amount > current_balance:
+                await update.message.reply_text(
+                    f"❌ Недостаточно средств на платформе {platform}. Доступно: {current_balance:.2f}€"
+                )
+                return
+
             context.user_data["amount"] = amount
             context.user_data["bet_step"] = "coeff"
-            await update.message.reply_text("Введи коэффициент:")
+
+            percentage = (amount / current_balance) * 100
+            warning = f"\n⚠️ Это {percentage:.1f}% от банка {platform}. Уверен?" if percentage >= 20 else ""
+
+            await update.message.reply_text(f"Введи коэффициент:{warning}")
         except:
             await update.message.reply_text("⚠️ Введи корректную сумму.")
         return
@@ -151,7 +170,7 @@ async def bet_step_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data.clear()
 
         await update.message.reply_text(
-            f"✅ Ставка добавлена: {bet['match']}, {bet['amount']}€, кэф {bet['coeff']} ({'#' + bet['type']})\n"
+            f"✅ Ставка добавлена: {bet['match']}, {bet['amount']}€ @ {bet['coeff']} ({'#' + bet['type']})\n"
             f"💰 Банк {bet['source']}: {user['banks'][bet['source']]:.2f}€"
         )
 
