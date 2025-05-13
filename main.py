@@ -15,7 +15,7 @@ from handlers.reminders import morning_reminder
 from handlers.goal import goal
 from handlers.analysis import top_teams, review, mybets
 from handlers.auth import auth_handler
-from handlers.core import load_save_command, handle_save_upload
+from handlers.core import load_save_command, handle_save_upload, reload_data_command
 
 
 load_dotenv()

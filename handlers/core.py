@@ -2,7 +2,7 @@ from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 from auth_config import ALLOWED_USERS
-from utils.storage import get_user, save_data, users_data
+from utils.storage import get_user, save_data,load_data, users_data
 from utils.auth import require_auth
 import json
 import os
@@ -12,6 +12,14 @@ ADMIN_ID = 2047828228  # ← поставь сюда свой chat_id
 DATA_FILE = "/mnt/data/users_data.json"
 
 SAVE_PATH = "/mnt/data/users_data.json"
+
+async def reload_data_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        await update.message.reply_text("⛔ У тебя нет доступа к этой команде.")
+        return
+
+    load_data()
+    await update.message.reply_text("✅ Данные перезагружены из файла.")
 
 # Команда /load_save — включить режим загрузки
 async def load_save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
