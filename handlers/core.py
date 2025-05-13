@@ -29,7 +29,42 @@ async def load_save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Приём и обработка файла
 async def handle_save_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.user_data.get("awaiting_save_file"):
-        return  # Не ждём файл — игнорируем
+        return
+
+    document = update.message.document
+    if not document or not document.file_name.endswith(".json"):
+        await update.message.reply_text("⚠️ Пришли корректный .json файл.")
+        return
+
+    file = await document.get_file()
+    await file.download_to_drive(SAVE_PATH)
+
+    try:
+        with open(SAVE_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        if not isinstance(data, dict) or not data:
+            await update.message.reply_text("⚠️ Файл пустой или содержит неправильный формат.")
+            return
+
+        users_data.clear()
+        users_data.update(data)
+        save_data()
+
+        user_count = len(users_data)
+        bet_count = sum(len(u.get("bets", [])) for u in users_data.values())
+
+        await update.message.reply_text(
+            f"✅ Сейв-файл успешно загружен.\n"
+            f"👥 Пользователей: {user_count}\n"
+            f"💸 Ставок: {bet_count}"
+        )
+
+    except Exception as e:
+        await update.message.reply_text(f"❌ Ошибка при загрузке: {e}")
+    finally:
+        context.user_data["awaiting_save_file"] = False
+
 
     document = update.message.document
     if not document or not document.file_name.endswith(".json"):
