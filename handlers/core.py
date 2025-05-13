@@ -34,6 +34,8 @@ async def handle_save_upload(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     file = await document.get_file()
     await file.download_to_drive(SAVE_PATH)
+    # Добавляем печать
+    print(f"📥 Файл загружен: {SAVE_PATH}")
 
     try:
         with open(SAVE_PATH, "r", encoding="utf-8") as f:
