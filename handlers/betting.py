@@ -1,15 +1,14 @@
-from telegram import Update
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
-from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 import datetime
 from utils.storage import get_user, save_data, LATVIA_TZ
 from utils.auth import require_auth
 
-# /bet (начало диалога)
 @require_auth
 async def bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
     context.user_data["bet_step"] = "sport"
+
     keyboard = [
         [InlineKeyboardButton("CS2", callback_data="sport_CS2")],
         [InlineKeyboardButton("Футбол", callback_data="sport_Футбол")],
@@ -18,50 +17,11 @@ async def bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
 
     await update.message.reply_text(
-        "⚽ Выбери вид спорта для ставки:",
+        "⚽ Выбери вид спорта:",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-    context.user_data["bet_step"] = "match"
-    await update.message.reply_text("Введи название матча (пример: NaVi vs G2)")
-    
-    keyboard = [
-    [InlineKeyboardButton("#safe", callback_data="type_safe")],
-    [InlineKeyboardButton("#value", callback_data="type_value")],
-    [InlineKeyboardButton("Пропустить", callback_data="type_auto")]
-    ]
-    await update.message.reply_text("Выбери тип ставки или пропусти:", reply_markup=InlineKeyboardMarkup(keyboard))
-
-
-# /cancel
-async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if "bet_step" in context.user_data:
-        context.user_data.clear()
-        await update.message.reply_text("❌ Ввод ставки отменён.")
-    else:
-        await update.message.reply_text("ℹ️ Сейчас ты не вводишь ставку.")
-
-# Список активных ставок
-async def pending(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_id = str(update.effective_chat.id)
-    user = get_user(chat_id)
-
-    pending_bets = [b for b in user["bets"] if b["status"] == "pending"]
-    if not pending_bets:
-        await update.message.reply_text("✅ Все ставки завершены!")
-        return
-
-    msg = "📋 <b>Твои активные ставки:</b>\n\n"
-    for i, b in enumerate(pending_bets, 1):
-        dt = datetime.datetime.fromisoformat(b["time"]) if isinstance(b["time"], str) else b["time"]
-        msg += f"{i}. {b['match']} — {b['amount']}€ @ {b['coeff']} ({dt.strftime('%d.%m %H:%M')})\n"
-
-    await update.message.reply_text(msg, parse_mode="HTML")
-
-# Обработчик шагов при /bet
 async def bet_step_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    from handlers.today import process_today_lines
-
     query = update.callback_query
     if query:
         await query.answer()
@@ -72,138 +32,110 @@ async def bet_step_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if sport == "other":
                 context.user_data["bet_step"] = "sport_manual"
                 await query.message.reply_text("Введи вид спорта вручную:")
-            else:
-                context.user_data["sport"] = sport
-                context.user_data["bet_step"] = "match"
-                await query.message.reply_text(f"✅ Вид спорта: {sport}")
-                await query.message.reply_text("Введи название матча (пример: NaVi vs G2)")
+                return
+            context.user_data["sport"] = sport
+            context.user_data["bet_step"] = "match"
+            await query.message.reply_text(f"✅ Вид спорта: {sport}\nВведи матч (например: NaVi vs G2)")
+            return
 
-        elif data.startswith("type_"):
+        if data.startswith("type_"):
             t = data.split("_")[1]
             if t in ["safe", "value"]:
                 context.user_data["type"] = t
-                await query.message.reply_text(f"Тип ставки установлен: #{t}")
+                await query.message.reply_text(f"✅ Тип ставки: #{t}")
             else:
                 await query.message.reply_text("Тип ставки будет определён автоматически.")
-        return  # ⬅ Обрываем, чтобы не падать на update.message.text ниже
-
-    # === Обработка текстовых сообщений ===
-
-    if context.user_data.get("bet_step") == "sport_manual":
-        sport = update.message.text.strip()
-        context.user_data["sport"] = sport
-        context.user_data["bet_step"] = "match"
-        await update.message.reply_text(f"✅ Вид спорта: {sport}")
-        await update.message.reply_text("Введи название матча (пример: NaVi vs G2)")
-        return
-
-    if context.user_data.get("awaiting_today_input"):
-        context.user_data.pop("awaiting_today_input")
-        lines = update.message.text.splitlines()
-        if len(lines) < 2:
-            await update.message.reply_text("⚠️ Нужно минимум 2 строки: ставка и пояснение.")
+            context.user_data["bet_step"] = "platform"
+            keyboard = [
+                [InlineKeyboardButton("Optibet", callback_data="platform_optibet")],
+                [InlineKeyboardButton("Olybet", callback_data="platform_olybet")],
+                [InlineKeyboardButton("Bonus", callback_data="platform_bonus")],
+            ]
+            await query.message.reply_text("Выбери платформу:", reply_markup=InlineKeyboardMarkup(keyboard))
             return
-        await process_today_lines(update, context, lines)
-        return
 
+        if data.startswith("platform_"):
+            platform = data.split("_")[1]
+            context.user_data["platform"] = platform
+            context.user_data["bet_step"] = "reminder"
+            await query.message.reply_text("🔔 Хочешь установить напоминание о проверке этой ставки?\nВведи дату и время в формате: ДД.ММ ЧЧ:ММ\nИли напиши 'нет'")
+            return
+
+    # === TEXT INPUT ===
+    message = update.message.text.strip()
     step = context.user_data.get("bet_step")
     chat_id = str(update.effective_chat.id)
     user = get_user(chat_id)
 
+    if step == "sport_manual":
+        context.user_data["sport"] = message
+        context.user_data["bet_step"] = "match"
+        await update.message.reply_text(f"✅ Вид спорта: {message}\nВведи матч (например: NaVi vs G2)")
+        return
+
     if step == "match":
-        match = update.message.text.strip()
-        words = match.split()
-        if len(words) == 2 and "vs" not in match.lower():
-            match = f"{words[0]} vs {words[1]}"
-        context.user_data["match"] = match
-        context.user_data["bet_step"] = "platform"
-        await update.message.reply_text("Выбери платформу (optibet / olybet / bonus):")
-
-    elif step == "platform":
-        platform = update.message.text.lower().strip()
-        if platform not in ["optibet", "olybet", "bonus"]:
-            await update.message.reply_text("❌ Введи: optibet, olybet или bonus.")
-            return
-        context.user_data["platform"] = platform
+        context.user_data["match"] = message
         context.user_data["bet_step"] = "amount"
-        await update.message.reply_text("Введи сумму ставки в € (например: 2.5)")
+        await update.message.reply_text("💰 Введи сумму ставки в €:")
+        return
 
-    elif step == "amount":
+    if step == "amount":
         try:
-            amount = float(update.message.text.strip())
+            amount = float(message)
             if amount <= 0:
-                await update.message.reply_text("⚠️ Сумма должна быть больше 0.")
-                return
-
-            platform = context.user_data["platform"]
-            if amount > user["banks"][platform]:
-                await update.message.reply_text(f"⚠️ У тебя только {user['banks'][platform]:.2f}€ на {platform}.")
-                return
-
+                raise ValueError
             context.user_data["amount"] = amount
             context.user_data["bet_step"] = "coeff"
-
-            percentage = (amount / user["banks"][platform]) * 100
-            warning = f"\n⚠️ Это {percentage:.1f}% от банка {platform}. Уверен?" if percentage >= 20 else ""
-            await update.message.reply_text(f"Введи коэффициент (например: 1.85){warning}")
+            await update.message.reply_text("Введи коэффициент:")
         except:
-            await update.message.reply_text("⚠️ Введи корректное число.")
+            await update.message.reply_text("⚠️ Введи корректную сумму.")
+        return
 
-    elif step == "coeff":
+    if step == "coeff":
         try:
-            coeff = float(update.message.text.strip())
+            coeff = float(message)
             if coeff < 1:
-                await update.message.reply_text("⚠️ Коэффициент должен быть не меньше 1.00")
-                return
-
+                raise ValueError
             context.user_data["coeff"] = coeff
-            context.user_data["bet_step"] = "reminder"
-            await update.message.reply_text(
-                "🔔 Хочешь установить напоминание о проверке этой ставки?\n"
-                "Введи дату и время в формате: <b>ДД.ММ ЧЧ:ММ</b>\n"
-                "Или напиши <b>нет</b>, если не нужно.",
-                parse_mode="HTML"
-            )
+            context.user_data["bet_step"] = "type"
+            keyboard = [
+                [InlineKeyboardButton("#safe", callback_data="type_safe")],
+                [InlineKeyboardButton("#value", callback_data="type_value")],
+                [InlineKeyboardButton("Пропустить", callback_data="type_auto")]
+            ]
+            await update.message.reply_text("Выбери тип ставки или пропусти:", reply_markup=InlineKeyboardMarkup(keyboard))
         except:
             await update.message.reply_text("⚠️ Введи корректный коэффициент.")
+        return
 
-    elif step == "reminder":
-        answer = update.message.text.strip().lower()
+    if step == "reminder":
         match = context.user_data["match"]
         now = datetime.datetime.now(LATVIA_TZ)
-
-        if answer in ["нет", "no"]:
+        if message.lower() in ["нет", "no"]:
             reminder_time = None
         else:
             try:
-                naive_dt = datetime.datetime.strptime(answer, "%d.%m %H:%M")
-                dt = naive_dt.replace(tzinfo=LATVIA_TZ)
-
-                if dt.astimezone(datetime.timezone.utc) <= now.astimezone(datetime.timezone.utc):
-                    await update.message.reply_text(
-                        f"⚠️ Указанное время уже прошло. Напоминание не установлено.\n"
-                        f"Сейчас: <b>{now.strftime('%d.%m %H:%M')}</b>\n"
-                        f"Попробуй снова или напиши <b>нет</b>.",
-                        parse_mode="HTML"
-                    )
-                    return
+                dt = datetime.datetime.strptime(message, "%d.%m %H:%M").replace(tzinfo=LATVIA_TZ)
+                if dt < now:
+                    raise ValueError
                 reminder_time = dt.isoformat()
             except:
-                await update.message.reply_text("⚠️ Неверный формат. Используй ДД.ММ ЧЧ:ММ")
+                await update.message.reply_text("⚠️ Неверный формат. Используй ДД.ММ ЧЧ:ММ или 'нет'")
                 return
 
         bet = {
+            "sport": context.user_data["sport"],
             "match": context.user_data["match"],
             "amount": context.user_data["amount"],
             "coeff": context.user_data["coeff"],
-            "status": "pending",
-            "time": now,
             "type": context.user_data.get("type") or (
                 "safe" if context.user_data["coeff"] <= 1.20 else
                 "value" if 1.60 <= context.user_data["coeff"] <= 2.50 else
                 "normal"
             ),
-            "source": context.user_data["platform"]
+            "source": context.user_data["platform"],
+            "status": "pending",
+            "time": now
         }
 
         user["bets"].append(bet)
@@ -222,4 +154,3 @@ async def bet_step_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 when=dt - now
             )
             await update.message.reply_text(f"🔔 Напоминание установлено на {dt.strftime('%d.%m %H:%M')}")
-
