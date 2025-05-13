@@ -6,26 +6,23 @@ from utils.storage import get_user
 from utils.timezone import LATVIA_TZ
 
 # /today — вставка прогнозов в формате ChatGPT
-async def today(update: Update, context: ContextTypes.DEFAULT_TYPE):
+def today(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     lines = text.splitlines()
 
     if len(lines) == 1:
         context.user_data["awaiting_today_input"] = True
-        await update.message.reply_text("📥 Вставь прогноз (список ставок), начиная со следующего сообщения.")
-        return
+        return update.message.reply_text("📥 Вставь прогноз (список ставок), начиная со следующего сообщения.")
 
     lines = lines[1:]  # убираем /today
     if len(lines) < 2:
-        await update.message.reply_text("⚠️ Вставь прогноз в формате:\n\nМатч – исход @кэф\nПояснение")
-        return
+        return update.message.reply_text("⚠️ Вставь прогноз в формате:\n\nМатч – исход @кэф\nПояснение")
 
-    await process_today_lines(update, context, lines)
+    return process_today_lines(update, context, lines)
 
 # Обработка строк прогноза из ChatGPT
 async def process_today_lines(update: Update, context: ContextTypes.DEFAULT_TYPE, lines: list[str]):
     safe, value = [], []
-    deadline_line = ""
     i = 0
     while i < len(lines):
         line = lines[i].strip()
@@ -33,105 +30,106 @@ async def process_today_lines(update: Update, context: ContextTypes.DEFAULT_TYPE
             i += 1
             continue
 
-        explanation = ""
-        start_time = ""
-        end_time = ""
-        stake_line = ""
-
-        if i + 1 < len(lines):
-            next_line = lines[i + 1].strip()
-            if next_line and "@" not in next_line:
-                explanation = next_line
-                i += 1
-
-        for _ in range(4):  # максимум 4 строки после прогноза
-            if i + 1 >= len(lines):
-                break
-            next_line = lines[i + 1].strip().lower()
-            if next_line.startswith("начало:"):
-                start_time = lines[i + 1].strip()
-            elif next_line.startswith("окончание:") or next_line.startswith("оконч:"):
-                end_time = lines[i + 1].strip()
-            elif next_line.startswith("ставить до:") or next_line.startswith("до:"):
-                deadline_line = lines[i + 1].strip()
-            elif next_line.startswith("рекомендованная сумма:"):
-                stake_line = lines[i + 1].strip()
-            else:
-                break
+        # Сбор дополнительных данных
+        explanation = start_time = end_time = deadline = stake = ""
+        # следующая строка — пояснение
+        if i+1 < len(lines) and "@" not in lines[i+1]:
+            explanation = lines[i+1].strip(); i += 1
+        # до 4 строк после
+        for _ in range(4):
+            if i+1 >= len(lines): break
+            nl = lines[i+1].strip()
+            ll = nl.lower()
+            if ll.startswith("начало:"): start_time = nl
+            elif ll.startswith("окончание:") or ll.startswith("оконч:"): end_time = nl
+            elif ll.startswith("ставить до:") or ll.startswith("до:"): deadline = nl
+            elif ll.startswith("рекомендованная сумма:"): stake = nl
+            else: break
             i += 1
 
         try:
             coeff = float(line.split("@")[-1].strip())
-        except:
-            coeff = None
+        except: coeff = None
 
-        full_entry = f"{line}"
-        if explanation: full_entry += f"\n💬 {explanation}"
-        if start_time:  full_entry += f"\n⏰ {start_time}"
-        if end_time:    full_entry += f"\n⏳ {end_time}"
-        if deadline_line: full_entry += f"\n🕓 {deadline_line}"
-        if stake_line:  full_entry += f"\n💵 {stake_line}"
+        entry = line
+        if explanation: entry += f"\n💬 {explanation}"
+        if start_time:  entry += f"\n⏰ {start_time}"
+        if end_time:    entry += f"\n⏳ {end_time}"
+        if deadline:    entry += f"\n🕓 {deadline}"
+        if stake:       entry += f"\n💵 {stake}"
 
         if coeff:
-            if coeff <= 1.20 and len(safe) < 2:
-                safe.append(full_entry)
-            elif 1.60 <= coeff <= 2.50 and len(value) < 5:
-                value.append(full_entry)
-
+            if coeff <= 1.20 and len(safe) < 2: safe.append(entry)
+            elif 1.60 <= coeff <= 2.50 and len(value) < 5: value.append(entry)
         i += 1
 
     msg = "📅 <b>Ставки на сегодня:</b>\n\n"
     if safe:
-        msg += "<b>#safe:</b>\n"
-        for idx, entry in enumerate(safe, 1):
-            msg += f"{idx}. {entry}\n\n"
+        msg += "<b>#safe:</b>\n" + "\n\n".join(f"{idx+1}. {e}" for idx,e in enumerate(safe)) + "\n\n"
     if value:
-        msg += "<b>#value:</b>\n"
-        for idx, entry in enumerate(value, 1):
-            msg += f"{idx}. {entry}\n\n"
-
-    total = len(safe) + len(value)
-    msg += f"💰 Всего: {total} {'ставка' if total == 1 else 'ставки' if total < 5 else 'ставок'}"
+        msg += "<b>#value:</b>\n" + "\n\n".join(f"{idx+1}. {e}" for idx,e in enumerate(value)) + "\n\n"
+    total = len(safe)+len(value)
+    msg += f"💰 Всего: {total} {'ставка' if total==1 else 'ставки' if total<5 else 'ставок'}"
 
     if not safe and not value:
-        await update.message.reply_text("⚠️ Ни одна ставка не распознана. Убедись, что используешь формат из промпта.")
-        return
+        return update.message.reply_text("⚠️ Ни одна ставка не распознана. Убедись, что используешь формат из промпта.")
 
-    await update.message.reply_text(msg, parse_mode=ParseMode.HTML)
+    return update.message.reply_text(msg, parse_mode=ParseMode.HTML)
 
-# /prompt — генерация ChatGPT-промпта
+# /prompt — выбор утреннего или вечернего промпта
 async def prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [[InlineKeyboardButton("💡 Получить промпт", callback_data="get_prompt")]]
+    keyboard = [
+        [InlineKeyboardButton("🌅 Утренний промпт", callback_data="prompt_morning")],
+        [InlineKeyboardButton("🌙 Вечерний промпт", callback_data="prompt_evening")]
+    ]
     await update.message.reply_text(
-        "Нажми кнопку ниже, чтобы получить промпт для ChatGPT:",
+        "Выбери пр\u043e\u043cпт для ChatGPT:",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-
+# Обработчик кнопок /prompt
 async def prompt_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    print("Prompt button clicked")
-    query = update.callback_query
-    await query.answer()
-
+    query = update.callback_query; await query.answer()
     chat_id = str(query.message.chat.id)
     user = get_user(chat_id)
-    banks = user["banks"]
+    banks = user.get("banks", {})
+    today = datetime.now(LATVIA_TZ).strftime("%d.%m.%Y")
 
-    today_str = datetime.now(LATVIA_TZ).strftime("%d.%m.%Y")
+    if query.data == "prompt_morning":
+        text = (
+            f"Найди 1–2 максимально надёжные #safe (1.10–1.25), до 5 логичных #value (1.60–2.80) "
+            f"и максимум 2 обоснованные #sharp (2.80–3.50) или #wildcard (3.50+) ставки на сегодня ({today}).\n"
+            "Приоритет: CS2, футбол, хоккей. Если есть оправданные варианты в теннисе, баскетболе и других дисциплинах — тоже включи.\n\n"
+            "Моя цель: с текущего банка дойти до €800.\n"
+            "Готов поставить до 70% банка в день, если ставки обоснованы.\n\n"
+            "Банк:\n"
+            f"- Optibet: €{banks.get('optibet',0):.2f}\n"
+            f"- Olybet:  €{banks.get('olybet',0):.2f}\n\n"
+            "Формат каждой ставки:\n"
+            "Команда1 vs Команда2 – исход @коэффициент\n"
+            "Краткое пояснение, почему ставка логична.\n"
+            "Начало: [время по Риге], окончание: ~[время окончания]\n"
+            "⏳ До какого времени желательно поставить\n"
+            "Рекомендованная сумма: €[сумма], [платформа]\n"
+            "Тег: #[safe]/#[value]/#[sharp]/#[wildcard]\n\n"
+            "❗️Только реальные матчи и линии. Не добавляй текст до или после — только чистый список."
+        )
+    else:  # evening
+        text = (
+            f"Есть ли ещё 1–3 логичных ставки (#value, #sharp или #wildcard) на вечер/ночь сегодня ({today})?\n"
+            "Проверь, появились ли актуальные матчи по CS2, хоккею, NBA, футболу или другим дисциплинам с вечерними событиями.\n\n"
+            "Учитывай остаток моего банка:\n"
+            f"- Optibet: €{banks.get('optibet',0):.2f}\n"
+            f"- Olybet:  €{banks.get('olybet',0):.2f}\n\n"
+            "Формат каждой ставки:\n"
+            "Команда1 vs Команда2 – исход @коэффициент\n"
+            "Краткое пояснение, почему ставка логична.\n"
+            "Начало: [время по Риге], окончание: ~[время окончания]\n"
+            "⏳ До какого времени желательно поставить\n"
+            "Рекомендованная сумма: €[сумма], [платформа]\n"
+            "Тег: #[value]/#[sharp]/#[wildcard]\n\n"
+            "❗️Ищи глубоко и выбирай только действительно стоящие варианты.\n"
+            "❗️Без воды — только список в формате выше."
+        )
 
-    prompt_text = (
-        f"Найди 0–2 максимально надёжные #safe ставки и 0–5 логичных #value ставок на {today_str} по CS2, футболу и хоккею.\n"
-        "Если есть действительно ценные ставки в других дисциплинах — тоже включи.\n\n"
-        "Учитывай мой текущий банк:\n"
-        f"- 🏦 Optibet: €{banks['optibet']:.2f}\n"
-        f"- 🏦 Olybet: €{banks['olybet']:.2f}\n\n"
-        "Формат каждой ставки:\n"
-        "Команда1 vs Команда2 – исход @коэффициент\n"
-        "Краткое пояснение, почему ставка логична.\n"
-        "Начало: [время по Риге], окончание: ~[время окончания]\n"
-        "⏳ Укажи также *до какого времени желательно сделать ставку*\n"
-        "Рекомендованная сумма: €[сумма], [платформа]\n\n"
-        "❗️Не добавляй вводный или завершающий текст. Только чистый список в этом формате."
-    )
-
-    await query.message.reply_text(prompt_text)
+    await query.message.reply_text(text)
