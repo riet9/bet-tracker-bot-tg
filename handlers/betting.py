@@ -154,3 +154,29 @@ async def bet_step_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 when=dt - now
             )
             await update.message.reply_text(f"🔔 Напоминание установлено на {dt.strftime('%d.%m %H:%M')}")
+
+
+# /cancel
+async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if "bet_step" in context.user_data:
+        context.user_data.clear()
+        await update.message.reply_text("❌ Ввод ставки отменён.")
+    else:
+        await update.message.reply_text("ℹ️ Сейчас ты не вводишь ставку.")
+
+# Список активных ставок
+async def pending(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = str(update.effective_chat.id)
+    user = get_user(chat_id)
+
+    pending_bets = [b for b in user["bets"] if b["status"] == "pending"]
+    if not pending_bets:
+        await update.message.reply_text("✅ Все ставки завершены!")
+        return
+
+    msg = "📋 <b>Твои активные ставки:</b>\n\n"
+    for i, b in enumerate(pending_bets, 1):
+        dt = datetime.datetime.fromisoformat(b["time"]) if isinstance(b["time"], str) else b["time"]
+        msg += f"{i}. {b['match']} — {b['amount']}€ @ {b['coeff']} ({dt.strftime('%d.%m %H:%M')})\n"
+
+    await update.message.reply_text(msg, parse_mode="HTML")
