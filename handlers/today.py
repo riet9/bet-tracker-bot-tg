@@ -101,11 +101,12 @@ async def process_today_lines(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 # /prompt — генерация ChatGPT-промпта
 async def prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [[InlineKeyboardButton("💡 Получить промпт", callback_data="send_prompt")]]
+    keyboard = [[InlineKeyboardButton("💡 Получить промпт", callback_data="get_prompt")]]
     await update.message.reply_text(
         "Нажми кнопку ниже, чтобы получить промпт для ChatGPT:",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
+
 
 async def prompt_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query

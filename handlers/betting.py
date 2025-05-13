@@ -1,5 +1,6 @@
 from telegram import Update
 from telegram.ext import ContextTypes
+from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 import datetime
 from utils.storage import get_user, save_data, LATVIA_TZ
 from utils.auth import require_auth
@@ -7,6 +8,20 @@ from utils.auth import require_auth
 # /bet (начало диалога)
 @require_auth
 async def bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data.clear()
+    context.user_data["bet_step"] = "sport"
+    keyboard = [
+        [InlineKeyboardButton("CS2", callback_data="sport_CS2")],
+        [InlineKeyboardButton("Футбол", callback_data="sport_Футбол")],
+        [InlineKeyboardButton("Хоккей", callback_data="sport_Хоккей")],
+        [InlineKeyboardButton("Другое", callback_data="sport_other")]
+    ]
+
+    await update.message.reply_text(
+        "⚽ Выбери вид спорта для ставки:",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
     context.user_data["bet_step"] = "match"
     await update.message.reply_text("Введи название матча (пример: NaVi vs G2)")
 
@@ -38,6 +53,15 @@ async def pending(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Обработчик шагов при /bet
 async def bet_step_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from handlers.today import process_today_lines
+
+    if context.user_data.get("bet_step") == "sport_manual":
+        sport = update.message.text.strip()
+        context.user_data["sport"] = sport
+        context.user_data["bet_step"] = "type"
+        await update.message.reply_text(f"✅ Вид спорта: {sport}")
+        # сюда потом добавим следующий шаг
+        return
+
 
     if context.user_data.get("awaiting_today_input"):
         context.user_data.pop("awaiting_today_input")

@@ -9,6 +9,18 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = get_user(chat_id)
     data = query.data
 
+    if data.startswith("sport_"):
+        sport = data.split("_", 1)[1]
+        if sport == "other":
+            context.user_data["bet_step"] = "sport_manual"
+            await query.edit_message_text("📝 Введи вид спорта вручную:")
+        else:
+            context.user_data["sport"] = sport
+            context.user_data["bet_step"] = "type"
+            await query.edit_message_text(f"✅ Вид спорта: {sport}")
+            # сюда потом добавим следующий шаг (выбор типа ставки)
+        return
+
     if data.startswith("res_"):
         index = int(data.split("_")[1])
         context.user_data["selected"] = index
