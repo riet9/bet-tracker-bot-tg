@@ -85,6 +85,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             user = get_user(chat_id)
             user["login"] = login
+            user["authorized"] = True
             save_data()
 
             context.user_data.pop("auth_step", None)
