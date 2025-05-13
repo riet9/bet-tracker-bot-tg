@@ -56,13 +56,14 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler("users_count", users_count))
     
     app.add_handler(CallbackQueryHandler(prompt_button_handler, pattern="^get_prompt$"))
+    app.add_handler(CallbackQueryHandler(button_handler, pattern="^(res_|del_|undel_|win|lose)"))
     app.add_handler(CallbackQueryHandler(bet_step_handler))  # должен идти после pattern="^get_prompt$"
     app.add_handler(CommandHandler("admin_download", admin_download))
 
     # app.add_handler(CommandHandler("admin_backup_push", admin_backup_push))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, auth_handler))
     # app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, bet_step_handler))
-    app.add_handler(CallbackQueryHandler(button_handler))
+    # app.add_handler(CallbackQueryHandler(button_handler))
 
     app.run_polling()
     
