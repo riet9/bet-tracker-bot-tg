@@ -11,6 +11,38 @@ import os
 ADMIN_ID = 2047828228  # ← поставь сюда свой chat_id
 DATA_FILE = "/mnt/data/users_data.json"
 
+SAVE_PATH = "/mnt/data/users_data.json"
+
+# Команда /load_save — включить режим загрузки
+async def load_save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data["awaiting_save_file"] = True
+    await update.message.reply_text("📥 Пришли файл сейва (.json), чтобы восстановить данные.")
+
+# Приём и обработка файла
+async def handle_save_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.user_data.get("awaiting_save_file"):
+        return  # Не ждём файл — игнорируем
+
+    document = update.message.document
+    if not document or not document.file_name.endswith(".json"):
+        await update.message.reply_text("⚠️ Пришли корректный .json файл.")
+        return
+
+    file = await document.get_file()
+    await file.download_to_drive(SAVE_PATH)
+
+    try:
+        with open(SAVE_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            users_data.clear()
+            users_data.update(data)
+        save_data()
+        await update.message.reply_text("✅ Сейв-файл успешно загружен.")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Ошибка при загрузке: {e}")
+    finally:
+        context.user_data["awaiting_save_file"] = False
+
 """
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = str(update.effective_chat.id)

@@ -15,6 +15,7 @@ from handlers.reminders import morning_reminder
 from handlers.goal import goal
 from handlers.analysis import top_teams, review, mybets
 from handlers.auth import auth_handler
+from handlers.core import load_save_command, handle_save_upload
 
 
 load_dotenv()
@@ -54,7 +55,9 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler("review", review))
     app.add_handler(CommandHandler("mybets", mybets))
     app.add_handler(CommandHandler("users_count", users_count))
-    
+    app.add_handler(CommandHandler("load_save", load_save_command))
+    app.add_handler(MessageHandler(filters.Document.ALL, handle_save_upload))
+
     app.add_handler(CallbackQueryHandler(prompt_button_handler, pattern="^get_prompt$"))
     app.add_handler(CallbackQueryHandler(button_handler, pattern="^(res_|del_|undel_|win|lose)"))
     app.add_handler(CallbackQueryHandler(bet_step_handler))  # должен идти после pattern="^get_prompt$"
