@@ -35,12 +35,14 @@ async def handle_save_upload(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
 
     file = await document.get_file()
-    # Ensure the directory exists
-    os.makedirs(os.path.dirname(SAVE_PATH), exist_ok=True)  # Create the directory if it doesn't exist
-    await file.download_to_drive(SAVE_PATH)
 
-    # Log to check if file was saved
+    # ── make sure the folder exists before writing ──
+    import os
+    os.makedirs(os.path.dirname(SAVE_PATH), exist_ok=True)
+
+    await file.download_to_drive(SAVE_PATH)
     print(f"📥 Файл загружен: {SAVE_PATH}")
+
     
     try:
         with open(SAVE_PATH, "r", encoding="utf-8") as f:
