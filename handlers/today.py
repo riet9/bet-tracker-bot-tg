@@ -120,7 +120,8 @@ async def prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-# Обработчик кнопок /prompt\async def prompt_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# Обработчик кнопок /prompt
+async def prompt_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     chat_id = str(query.message.chat.id)
@@ -130,10 +131,9 @@ async def prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if query.data == 'prompt_morning':
         text = (
-            f"Найди 1–2 максимально надёжные #safe (1.10–1.25), до 5 логичных #value (1.60–2.80) и"  
-            f"3 максимум 2 обоснованные #sharp (2.80–3.50) или #wildcard (3.50+) ставки на сегодня ({today}).\n"
-            "Приоритет: CS2, футбол, хоккей. Если есть оправданные варианты в теннисе,"  
-            "баскетболе и других дисциплинах — тоже включи.\n\n"
+            f"Найди 1–2 максимально надёжные #safe (1.10–1.25), до 5 логичных #value (1.60–2.80) и "
+            f"максимум 2 обоснованные #sharp (2.80–3.50) или #wildcard (3.50+) ставки на сегодня ({today}).\n"
+            "Приоритет: CS2, футбол, хоккей. Если есть оправданные варианты в теннисе, баскетболе и других дисциплинах — тоже включи.\n\n"
             "Моя цель: с текущего банка дойти до €800.\n"
             "Готов поставить до 70% банка в день, если ставки обоснованы.\n\n"
             "Банк:\n"
@@ -150,10 +150,8 @@ async def prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     else:
         text = (
-            f"Есть ли ещё 1–3 логичных ставки (#value, #sharp или #wildcard)"  
-            f"на вечер/ночь сегодня ({today})?\n"
-            "Проверь, появились ли актуальные матчи по CS2, хоккею, NBA, футболу"  
-            "или другим дисциплинам с вечерними событиями.\n\n"
+            f"Есть ли ещё 1–3 логичных ставки (#value, #sharp или #wildcard) на вечер/ночь сегодня ({today})?\n"
+            "Проверь, появились ли актуальные матчи по CS2, хоккею, NBA, футболу или другим дисциплинам с вечерними событиями.\n\n"
             "Учитывай остаток моего банка:\n"
             f"- Optibet: €{banks.get('optibet',0):.2f}\n"
             f"- Olybet:  €{banks.get('olybet',0):.2f}\n\n"
