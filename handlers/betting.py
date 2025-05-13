@@ -35,7 +35,8 @@ async def bet_step_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 return
             context.user_data["sport"] = sport
             context.user_data["bet_step"] = "match"
-            await query.message.reply_text(f"✅ Вид спорта: {sport}\nВведи матч (например: NaVi vs G2)")
+            await query.message.reply_text(f"✅ Вид спорта: {sport}")
+            await query.message.reply_text("Введи матч (например: NaVi vs G2)")
             return
 
         if data.startswith("type_"):
@@ -70,7 +71,8 @@ async def bet_step_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if step == "sport_manual":
         context.user_data["sport"] = message
         context.user_data["bet_step"] = "match"
-        await update.message.reply_text(f"✅ Вид спорта: {message}\nВведи матч (например: NaVi vs G2)")
+        await update.message.reply_text(f"✅ Вид спорта: {message}")
+        await update.message.reply_text("Введи матч (например: NaVi vs G2)")
         return
 
     if step == "match":
@@ -154,6 +156,7 @@ async def bet_step_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 when=dt - now
             )
             await update.message.reply_text(f"🔔 Напоминание установлено на {dt.strftime('%d.%m %H:%M')}")
+
 
 
 # /cancel
