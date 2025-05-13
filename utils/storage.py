@@ -8,7 +8,6 @@ DATA_FILE = "/mnt/data/users_data.json"
 LATVIA_TZ = ZoneInfo("Europe/Riga")
 users_data = {}
 
-
 def load_data():
     global users_data
     try:
@@ -18,7 +17,6 @@ def load_data():
             return
         with open(DATA_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
-        # Мутируем существующий словарь, чтобы все импорты ссылались на одну структуру
         users_data.clear()
         users_data.update(data)
         print("📂 load_data() вызван — загружено пользователей:", len(users_data))
@@ -26,15 +24,7 @@ def load_data():
         users_data.clear()
         print(f"[ERROR] Ошибка при загрузке: {e}")
 
-
-def save_data()
-
-        # Авто-привязка после загрузки сейва: восстанавливаем авторизацию
-        chat_id = str(update.effective_chat.id)
-        user = users_data.get(chat_id, {})
-        if "login" in user:
-            context.user_data["authorized"] = True
-            context.user_data["login"] = user["login"]:
+def save_data():
     try:
         os.makedirs(os.path.dirname(DATA_FILE), exist_ok=True)
         with open(DATA_FILE, "w", encoding="utf-8") as f:
@@ -43,11 +33,9 @@ def save_data()
     except Exception as e:
         print(f"[ERROR] Ошибка при сохранении: {e}")
 
-
 def get_user(chat_id: str):
     chat_id = str(chat_id)
     return users_data.get(chat_id, {})
-
 
 def create_user(chat_id: str, login: str):
     global users_data
