@@ -6,7 +6,12 @@ from utils.auth import require_auth
 
 @require_auth
 async def bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    authorized = context.user_data.get("authorized")
+    login = context.user_data.get("login")
     context.user_data.clear()
+    context.user_data["authorized"] = authorized
+    context.user_data["login"] = login
+
     context.user_data["bet_step"] = "sport"
 
     keyboard = [
