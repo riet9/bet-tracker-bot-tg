@@ -64,3 +64,12 @@ if __name__ == '__main__':
     app.add_handler(CallbackQueryHandler(button_handler))
 
     app.run_polling()
+    
+    
+"""
+cd "D:/Programms/Telegram_bet_bot"
+
+git add .
+git commit -m "Update: "
+git push
+"""

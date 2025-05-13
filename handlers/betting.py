@@ -24,6 +24,14 @@ async def bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     context.user_data["bet_step"] = "match"
     await update.message.reply_text("Введи название матча (пример: NaVi vs G2)")
+    
+    keyboard = [
+    [InlineKeyboardButton("#safe", callback_data="type_safe")],
+    [InlineKeyboardButton("#value", callback_data="type_value")],
+    [InlineKeyboardButton("Пропустить", callback_data="type_auto")]
+    ]
+    await update.message.reply_text("Выбери тип ставки или пропусти:", reply_markup=InlineKeyboardMarkup(keyboard))
+
 
 # /cancel
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -54,14 +62,40 @@ async def pending(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def bet_step_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from handlers.today import process_today_lines
 
+    query = update.callback_query
+    if query:
+        await query.answer()
+        data = query.data
+
+        if data.startswith("sport_"):
+            sport = data.split("_")[1]
+            if sport == "other":
+                context.user_data["bet_step"] = "sport_manual"
+                await query.message.reply_text("Введи вид спорта вручную:")
+            else:
+                context.user_data["sport"] = sport
+                context.user_data["bet_step"] = "match"
+                await query.message.reply_text(f"✅ Вид спорта: {sport}")
+                await query.message.reply_text("Введи название матча (пример: NaVi vs G2)")
+
+        elif data.startswith("type_"):
+            t = data.split("_")[1]
+            if t in ["safe", "value"]:
+                context.user_data["type"] = t
+                await query.message.reply_text(f"Тип ставки установлен: #{t}")
+            else:
+                await query.message.reply_text("Тип ставки будет определён автоматически.")
+        return  # ⬅ Обрываем, чтобы не падать на update.message.text ниже
+
+    # === Обработка текстовых сообщений ===
+
     if context.user_data.get("bet_step") == "sport_manual":
         sport = update.message.text.strip()
         context.user_data["sport"] = sport
-        context.user_data["bet_step"] = "type"
+        context.user_data["bet_step"] = "match"
         await update.message.reply_text(f"✅ Вид спорта: {sport}")
-        # сюда потом добавим следующий шаг
+        await update.message.reply_text("Введи название матча (пример: NaVi vs G2)")
         return
-
 
     if context.user_data.get("awaiting_today_input"):
         context.user_data.pop("awaiting_today_input")
@@ -127,7 +161,8 @@ async def bet_step_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(
                 "🔔 Хочешь установить напоминание о проверке этой ставки?\n"
                 "Введи дату и время в формате: <b>ДД.ММ ЧЧ:ММ</b>\n"
-                "Или напиши <b>нет</b>, если не нужно.", parse_mode="HTML"
+                "Или напиши <b>нет</b>, если не нужно.",
+                parse_mode="HTML"
             )
         except:
             await update.message.reply_text("⚠️ Введи корректный коэффициент.")
@@ -163,7 +198,7 @@ async def bet_step_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "coeff": context.user_data["coeff"],
             "status": "pending",
             "time": now,
-            "type": (
+            "type": context.user_data.get("type") or (
                 "safe" if context.user_data["coeff"] <= 1.20 else
                 "value" if 1.60 <= context.user_data["coeff"] <= 2.50 else
                 "normal"
@@ -174,7 +209,6 @@ async def bet_step_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user["bets"].append(bet)
         user["banks"][context.user_data["platform"]] -= context.user_data["amount"]
         save_data()
-
         context.user_data.clear()
 
         await update.message.reply_text(
@@ -188,3 +222,4 @@ async def bet_step_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 when=dt - now
             )
             await update.message.reply_text(f"🔔 Напоминание установлено на {dt.strftime('%d.%m %H:%M')}")
+
