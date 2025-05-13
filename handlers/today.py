@@ -109,6 +109,7 @@ async def prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def prompt_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    print("Prompt button clicked")
     query = update.callback_query
     await query.answer()
 
