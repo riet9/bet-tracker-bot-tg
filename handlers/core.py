@@ -23,6 +23,8 @@ async def load_save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["awaiting_save_file"] = True
     await update.message.reply_text("📥 Пришли файл сейва (.json), чтобы восстановить данные.")
 
+import os
+
 async def handle_save_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.user_data.get("awaiting_save_file"):
         return
@@ -33,10 +35,13 @@ async def handle_save_upload(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
 
     file = await document.get_file()
+    # Ensure the directory exists
+    os.makedirs(os.path.dirname(SAVE_PATH), exist_ok=True)  # Create the directory if it doesn't exist
     await file.download_to_drive(SAVE_PATH)
-    # Добавляем печать
-    print(f"📥 Файл загружен: {SAVE_PATH}")
 
+    # Log to check if file was saved
+    print(f"📥 Файл загружен: {SAVE_PATH}")
+    
     try:
         with open(SAVE_PATH, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -62,6 +67,7 @@ async def handle_save_upload(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await update.message.reply_text(f"❌ Ошибка при загрузке: {e}")
     finally:
         context.user_data["awaiting_save_file"] = False
+
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
