@@ -27,7 +27,14 @@ def load_data():
         print(f"[ERROR] Ошибка при загрузке: {e}")
 
 
-def save_data():
+def save_data()
+
+        # Авто-привязка после загрузки сейва: восстанавливаем авторизацию
+        chat_id = str(update.effective_chat.id)
+        user = users_data.get(chat_id, {})
+        if "login" in user:
+            context.user_data["authorized"] = True
+            context.user_data["login"] = user["login"]:
     try:
         os.makedirs(os.path.dirname(DATA_FILE), exist_ok=True)
         with open(DATA_FILE, "w", encoding="utf-8") as f:
